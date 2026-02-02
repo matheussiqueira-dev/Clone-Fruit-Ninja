@@ -1,61 +1,71 @@
 # Fruit Ninja Clone (TikTok / Reels Edition)
 
-Este pacote contem os scripts principais para um prototipo 2D vertical (9:16) com input continuo, spline de gesto, corte, slow motion, VFX e spawn procedural.
+A vertical (9:16) casual slicing prototype focused on fast gestures, cinematic slow motion, and strong visual feedback for short-form video capture.
 
-## Estrutura
+## Highlights
+- Continuous touch input with real-time gesture smoothing (Catmull-Rom spline)
+- Speed-based blade trail width + progressive fade
+- Slice detection with thickness based on swipe speed
+- Procedural fruit arcs optimized for camera framing
+- Smart slow motion (speed, center hit, combo triggers)
+- Particle pooling + per-frame budget
+- Subtle camera zoom on slow motion + impact shake
+- Webcam full-screen background for AR-style capture
+- Solid HUD blocks for score/status visibility
+
+## Tech Stack
+- Unity 6000.3.6f1 (or compatible 6000.x)
+- 2D physics (Rigidbody2D / Collider2D)
+- UGUI for HUD and webcam background
+
+## Project Structure
 - `Assets/Scripts/Input` (InputManager, GestureAnalyzer, BladeTrail)
 - `Assets/Scripts/Slicing` (SliceSystem, Fruit, FruitHalf, FruitDefinition)
 - `Assets/Scripts/SlowMo` (SlowMotionController)
 - `Assets/Scripts/Spawning` (FruitSpawner)
 - `Assets/Scripts/VFX` (VisualEffectsManager, ParticlePool, ImpactFlash)
 - `Assets/Scripts/Camera` (AspectRatioEnforcer, CameraImpulseController)
-- `Assets/Scripts/UI` (SafeAreaFitter)
-- `Assets/Scripts/UI` (WebcamBackground, HUDController)
+- `Assets/Scripts/UI` (SafeAreaFitter, WebcamBackground, HUDController, CreditsLink)
 - `Assets/Scripts/Gameplay` (ScoreManager)
 
-## Montagem rapida (Unity 2D)
-1. **Camera**
-   - Camera ortografica.
-   - Adicione `AspectRatioEnforcer` e `CameraImpulseController`.
-2. **Input + Gesture**
-   - Crie um GameObject `InputSystem` e adicione `InputManager` e `GestureAnalyzer`.
-   - Crie um GameObject `BladeTrail` com `LineRenderer` + `BladeTrail`.
-   - Em `BladeTrail`, referencie o `GestureAnalyzer`.
-3. **Slice System**
-   - Crie `SliceSystem` e referencie o `GestureAnalyzer`.
-   - Crie a layer `Fruit` e atribua no campo `fruitLayer`.
-4. **Slow Motion**
-   - Adicione `SlowMotionController` e conecte `SliceSystem` + `CameraImpulseController`.
-5. **VFX**
-   - Crie `VisualEffectsManager` e conecte `CameraImpulseController`.
-   - (Opcional) Instancie um prefab `ImpactFlash` e conecte no manager.
-6. **Background (Webcam)**
-   - Crie um `Canvas` no modo Screen Space - Overlay.
-   - Adicione um `RawImage` full screen (anchors 0..1) e aplique o script `WebcamBackground`.
-   - (Opcional) Ajuste `mirrorHorizontal` e o dispositivo da camera.
-6. **Frutas**
-   - Crie um prefab `Fruit` com `Rigidbody2D`, `Collider2D`, `SpriteRenderer` e `Fruit`.
-   - Crie prefabs `FruitHalf` (duas metades) com `Rigidbody2D`, `Collider2D`, `SpriteRenderer` e `FruitHalf`.
-   - Crie `FruitDefinition` assets e preencha: sprites, prefabs das metades, particulas, cores.
-7. **HUD / Score**
-   - Crie blocos solidos (`Image`) com `Text` para score/combos/status.
-   - Adicione `HUDController` e conecte os textos/blocks.
-   - Adicione `ScoreManager` e conecte `SliceSystem` + `HUDController`.
-8. **Creditos**
-   - Crie um `Text` com \"Desenvolvido por Matheus Siqueira\".
-   - Crie um `Button` com `Text` para o link `www.matheussiqueira.dev`.
-   - Adicione `CreditsLink` e conecte o `Button` + textos (o click abre o site).
-9. **Spawner**
-   - Crie `FruitSpawner` e atribua o prefab `Fruit` + lista de `FruitDefinition`.
+## Quick Start (Scene Wiring)
+1) Camera
+   - Orthographic camera.
+   - Add `AspectRatioEnforcer` and `CameraImpulseController`.
+2) Input + Gesture
+   - Create `InputSystem` with `InputManager` + `GestureAnalyzer`.
+   - Create `BladeTrail` with `LineRenderer` + `BladeTrail`.
+3) Slice System
+   - Create `SliceSystem` and reference `GestureAnalyzer`.
+   - Create layer `Fruit` and assign to fruit prefabs.
+4) Slow Motion
+   - Add `SlowMotionController` and wire `SliceSystem` + `CameraImpulseController`.
+5) VFX
+   - Add `VisualEffectsManager` and wire `CameraImpulseController`.
+   - (Optional) `ImpactFlash` prefab connected to the manager.
+6) Webcam Background
+   - Create `Canvas` (Screen Space - Overlay).
+   - Add a full-screen `RawImage` and attach `WebcamBackground`.
+7) HUD / Score
+   - Create solid `Image` blocks with `Text` for score/combos/status.
+   - Add `HUDController` and wire the texts/blocks.
+   - Add `ScoreManager` and wire `SliceSystem` + `HUDController`.
+8) Fruits
+   - Create a `Fruit` prefab with `Rigidbody2D`, `Collider2D`, `SpriteRenderer`, `Fruit`.
+   - Create two `FruitHalf` prefabs with `Rigidbody2D`, `Collider2D`, `SpriteRenderer`, `FruitHalf`.
+   - Create `FruitDefinition` assets and assign sprites, halves, juice particles, colors.
+9) Spawner
+   - Add `FruitSpawner` and assign the `Fruit` prefab + definitions list.
 
-## Notas
-- `InputManager` usa `Time.unscaledTime` para garantir input durante slow motion.
-- `SliceSystem` usa `CircleCast` para espessura do corte baseada na velocidade.
-- `VisualEffectsManager` aplica budget por frame para particulas.
-- `CameraImpulseController` adiciona zoom suave no slow motion e shake de impacto.
+## Notes
+- Input uses `Time.unscaledTime`, so slow motion never blocks touch.
+- Slice detection uses `CircleCast` for speed-based blade thickness.
+- Particle pool enforces a per-frame budget for mobile stability.
+- Webcam background supports rotation, mirroring, and full-screen fill.
 
-## Ajustes recomendados
-- `GestureAnalyzer.smoothingDistance` para suavidade da spline.
-- `BladeTrail` para largura e fade.
-- `SlowMotionController` para thresholds de velocidade/centro/combo.
-- `FruitSpawner` para arcos e cadencia de spawn.
+## Author
+Matheus Siqueira
+Website: https://www.matheussiqueira.dev
+
+## License
+TBD
