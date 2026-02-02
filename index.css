@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Trebuchet MS", "Segoe UI", Tahoma, sans-serif;
+  background-color: #111;
+  overflow: hidden;
+}
+
+.font-ninja {
+  font-family: "Impact", "Haettenschweiler", "Arial Narrow Bold", sans-serif;
+  letter-spacing: 0.02em;
+}
