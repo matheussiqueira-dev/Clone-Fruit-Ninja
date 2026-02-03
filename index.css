@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Sora:wght@300;400;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -12,13 +14,60 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
-  font-family: "Trebuchet MS", "Segoe UI", Tahoma, sans-serif;
-  background-color: #111;
+  margin: 0;
+  font-family: "Sora", "Segoe UI", sans-serif;
+  background-color: #070a12;
+  color: #f8fafc;
   overflow: hidden;
 }
 
-.font-ninja {
-  font-family: "Impact", "Haettenschweiler", "Arial Narrow Bold", sans-serif;
-  letter-spacing: 0.02em;
+.font-display {
+  font-family: "Bebas Neue", "Oswald", sans-serif;
+  letter-spacing: 0.08em;
+}
+
+.app-shell {
+  background-color: #070a12;
+  isolation: isolate;
+}
+
+.app-gradient {
+  background:
+    radial-gradient(900px 600px at 12% -10%, rgba(245, 158, 11, 0.18), transparent 60%),
+    radial-gradient(700px 500px at 80% 0%, rgba(56, 189, 248, 0.14), transparent 60%),
+    radial-gradient(600px 500px at 90% 80%, rgba(14, 116, 144, 0.12), transparent 60%),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.95), rgba(7, 10, 18, 0.98));
+}
+
+.app-glow {
+  background:
+    radial-gradient(500px 300px at 20% 20%, rgba(251, 191, 36, 0.2), transparent 60%),
+    radial-gradient(400px 300px at 80% 70%, rgba(56, 189, 248, 0.16), transparent 60%);
+  mix-blend-mode: screen;
+  opacity: 0.8;
+}
+
+.app-noise {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 3px 3px;
+  opacity: 0.12;
+  mix-blend-mode: soft-light;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
