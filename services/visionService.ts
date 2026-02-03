@@ -13,44 +13,21 @@ export const initializeVision = async (): Promise<void> => {
 
   try {
     const vision = await FilesetResolver.forVisionTasks(VISION_BASE_PATH);
-    try {
-      handLandmarker = await HandLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath: HAND_MODEL_PATH,
-          delegate: "GPU"
-        },
-        runningMode: "VIDEO",
-        numHands: 1,
-        minHandDetectionConfidence: 0.6,
-        minTrackingConfidence: 0.6
-      });
-    } catch (gpuError) {
-      console.warn("GPU delegate failed, falling back to CPU.", gpuError);
-      handLandmarker = await HandLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath: HAND_MODEL_PATH,
-          delegate: "CPU"
-        },
-        runningMode: "VIDEO",
-        numHands: 1,
-        minHandDetectionConfidence: 0.6,
-        minTrackingConfidence: 0.6
-      });
-    }
+    handLandmarker = await HandLandmarker.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath: HAND_MODEL_PATH,
+        delegate: "GPU"
+      },
+      runningMode: "VIDEO",
+      numHands: 1
+    });
   } catch (error) {
     console.error("Failed to initialize vision:", error);
     throw error;
   }
 };
 
-interface DetectOptions {
-  mirror?: boolean;
-}
-
-export const detectHands = (
-  video: HTMLVideoElement,
-  options: DetectOptions = {}
-): VisionResult | null | undefined => {
+export const detectHands = (video: HTMLVideoElement): VisionResult | null | undefined => {
   if (!handLandmarker || !video.videoWidth) return undefined;
 
   const nowInMs = performance.now();
@@ -61,9 +38,8 @@ export const detectHands = (
     if (results.landmarks && results.landmarks.length > 0) {
       // Map all landmarks and mirror X
       const rawLandmarks = results.landmarks[0];
-      const mirror = options.mirror ?? true;
       const landmarks = rawLandmarks.map(l => ({
-        x: mirror ? 1 - l.x : l.x,
+        x: 1 - l.x,
         y: l.y
       }));
 

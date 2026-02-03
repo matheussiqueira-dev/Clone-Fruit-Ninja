@@ -10,27 +10,6 @@ export enum GameState {
   GAME_OVER = 'GAME_OVER'
 }
 
-export type InputMode = 'camera' | 'pointer';
-
-export type CameraStatus = 'idle' | 'loading' | 'ready' | 'error';
-
-export interface GameSettings {
-  mirrorVideo: boolean;
-  showCameraFeed: boolean;
-  showHandSkeleton: boolean;
-  showTrail: boolean;
-  lowVfx: boolean;
-}
-
-export interface GameStats {
-  score: number;
-  lives: number;
-  combo: number;
-  maxCombo: number;
-  sliced: number;
-  missed: number;
-}
-
 export interface Fruit {
   id: string;
   x: number;
@@ -59,5 +38,5 @@ export interface Particle {
 export interface VisionResult {
   x: number; // 0-1 normalized (Index Tip)
   y: number; // 0-1 normalized (Index Tip)
-  landmarks?: { x: number; y: number }[]; // All hand landmarks
+  landmarks: { x: number; y: number }[]; // All hand landmarks
 }
