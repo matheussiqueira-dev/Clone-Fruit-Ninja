@@ -1,0 +1,104 @@
+openapi: 3.1.0
+info:
+  title: Fruit Ninja Leaderboard API
+  version: 1.0.0
+  description: API para salvar e consultar ranking do jogo.
+servers:
+  - url: http://localhost:3333/api/v1
+paths:
+  /health:
+    get:
+      summary: Healthcheck
+      responses:
+        '200':
+          description: Serviço ativo
+  /leaderboard:
+    get:
+      summary: Lista ranking
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        '200':
+          description: Ranking retornado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LeaderboardEntry'
+                  total:
+                    type: integer
+    post:
+      summary: Registra pontuação
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LeaderboardSubmission'
+      responses:
+        '201':
+          description: Score salvo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LeaderboardEntry'
+                  total:
+                    type: integer
+        '400':
+          description: Payload inválido
+components:
+  schemas:
+    LeaderboardSubmission:
+      type: object
+      required:
+        - player
+        - score
+        - accuracy
+        - maxCombo
+        - inputMode
+      properties:
+        player:
+          type: string
+          minLength: 2
+          maxLength: 24
+        score:
+          type: integer
+          minimum: 0
+        accuracy:
+          type: integer
+          minimum: 0
+          maximum: 100
+        maxCombo:
+          type: integer
+          minimum: 0
+        inputMode:
+          type: string
+          enum: [camera, pointer]
+    LeaderboardEntry:
+      allOf:
+        - $ref: '#/components/schemas/LeaderboardSubmission'
+        - type: object
+          required:
+            - id
+            - createdAt
+          properties:
+            id:
+              type: string
+            createdAt:
+              type: string
+              format: date-time

@@ -61,3 +61,21 @@ export interface VisionResult {
   y: number; // 0-1 normalized (Index Tip)
   landmarks?: { x: number; y: number }[]; // All hand landmarks
 }
+
+export interface LeaderboardEntry {
+  id: string;
+  player: string;
+  score: number;
+  accuracy: number;
+  maxCombo: number;
+  inputMode: InputMode;
+  createdAt: string;
+}
+
+export interface LeaderboardSubmission {
+  player: string;
+  score: number;
+  accuracy: number;
+  maxCombo: number;
+  inputMode: InputMode;
+}

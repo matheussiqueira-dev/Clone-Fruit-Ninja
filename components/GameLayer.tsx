@@ -87,7 +87,7 @@ const GameLayer: React.FC<GameLayerProps> = ({
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = Math.floor(width * dpr);
     canvas.height = Math.floor(height * dpr);
     canvas.style.width = `${width}px`;
@@ -128,6 +128,11 @@ const GameLayer: React.FC<GameLayerProps> = ({
   useEffect(() => {
     const ctx = ctxRef.current;
     if (!ctx) return;
+    if (gameState !== GameState.PLAYING) {
+      ctx.clearRect(0, 0, width, height);
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      return;
+    }
 
     const spawnFruit = () => {
       const score = scoreRef.current;
@@ -176,14 +181,6 @@ const GameLayer: React.FC<GameLayerProps> = ({
       const lastFrame = lastFrameRef.current ?? now;
       const delta = Math.min((now - lastFrame) / 1000, MAX_DELTA);
       lastFrameRef.current = now;
-
-      if (gameState !== GameState.PLAYING) {
-        if (gameState === GameState.MENU || gameState === GameState.GAME_OVER || gameState === GameState.LOADING) {
-          ctx.clearRect(0, 0, width, height);
-        }
-        requestRef.current = requestAnimationFrame(loop);
-        return;
-      }
 
       ctx.clearRect(0, 0, width, height);
 
@@ -266,9 +263,11 @@ const GameLayer: React.FC<GameLayerProps> = ({
 
       spawnAccumulatorRef.current += delta;
       const spawnInterval = getSpawnInterval(scoreRef.current);
-      while (spawnAccumulatorRef.current >= spawnInterval) {
+      let spawned = 0;
+      while (spawnAccumulatorRef.current >= spawnInterval && spawned < 4) {
         spawnFruit();
         spawnAccumulatorRef.current -= spawnInterval;
+        spawned += 1;
       }
 
       const cutterTip = trailRef.current[trailRef.current.length - 1];

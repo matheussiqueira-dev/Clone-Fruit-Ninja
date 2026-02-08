@@ -61,6 +61,9 @@ export const detectHands = (
     if (results.landmarks && results.landmarks.length > 0) {
       // Map all landmarks and mirror X
       const rawLandmarks = results.landmarks[0];
+      if (!rawLandmarks || rawLandmarks.length < 9) {
+        return null;
+      }
       const mirror = options.mirror ?? true;
       const landmarks = rawLandmarks.map(l => ({
         x: mirror ? 1 - l.x : l.x,
@@ -79,4 +82,10 @@ export const detectHands = (
     return null; // Frame processed but no hands found
   }
   return undefined; // No new frame to process
+};
+
+export const disposeVision = () => {
+  handLandmarker?.close();
+  handLandmarker = undefined;
+  lastVideoTime = -1;
 };

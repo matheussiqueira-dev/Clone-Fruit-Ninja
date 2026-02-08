@@ -16,9 +16,21 @@ export const useWindowSize = () => {
   const [size, setSize] = useState<WindowSize>(getWindowSize);
 
   useEffect(() => {
-    const handleResize = () => setSize(getWindowSize());
+    let resizeFrame: number | null = null;
+    const handleResize = () => {
+      if (resizeFrame !== null) return;
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = null;
+        setSize(getWindowSize());
+      });
+    };
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (resizeFrame !== null) {
+        cancelAnimationFrame(resizeFrame);
+      }
+    };
   }, []);
 
   return size;

@@ -16,12 +16,33 @@ export const useLocalStorage = <T,>(key: string, initialValue: T) => {
   });
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     try {
       window.localStorage.setItem(key, JSON.stringify(value));
     } catch (error) {
       console.warn(`Failed to write localStorage key "${key}":`, error);
     }
   }, [key, value]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const syncValue = (event: StorageEvent) => {
+      if (event.key !== key) return;
+      if (event.newValue === null) {
+        setValue(initialValue);
+        return;
+      }
+      try {
+        setValue(JSON.parse(event.newValue) as T);
+      } catch (error) {
+        console.warn(`Failed to sync localStorage key "${key}":`, error);
+      }
+    };
+
+    window.addEventListener('storage', syncValue);
+    return () => window.removeEventListener('storage', syncValue);
+  }, [key, initialValue]);
 
   return [value, setValue] as const;
 };
