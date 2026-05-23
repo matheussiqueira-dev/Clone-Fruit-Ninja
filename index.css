@@ -5,16 +5,16 @@
 @tailwind utilities;
 
 :root {
-  --ms-bg: #040711;
-  --ms-surface: #0a1324;
+  --ms-bg: var(--bg-deep);
+  --ms-surface: var(--bg-soft);
   --ms-surface-soft: #111827;
   --ms-border: rgba(34, 211, 238, 0.22);
-  --ms-primary: #22d3ee;
+  --ms-primary: var(--accent-cyan);
   --ms-primary-soft: rgba(34, 211, 238, 0.12);
-  --ms-text: #f8fafc;
+  --ms-text: var(--text-main);
   --ms-muted: #94a3b8;
   --ms-success: #34d399;
-  --ms-warning: #fbbf24;
+  --ms-warning: var(--accent-gold);
   --ms-danger: #fb7185;
   --bg-deep: #040711;
   --bg-soft: #0a1324;
