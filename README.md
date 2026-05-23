@@ -224,5 +224,7 @@ npm run build:server
 - Modos adicionais de jogo (Time Attack, Zen, Daily Challenge).
 - e2e tests com Playwright.
 
-Autoria: Matheus Siqueira  
-Website: https://www.matheussiqueira.dev/
+## Créditos
+
+Desenvolvido por Matheus Siqueira.  
+Portfólio: https://www.matheussiqueira.dev

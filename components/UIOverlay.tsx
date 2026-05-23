@@ -8,6 +8,7 @@ import {
   LeaderboardEntry
 } from '../types';
 import { GAME_SHORTCUTS } from '../config/gameConfig';
+import ProjectCredits from './ProjectCredits';
 
 interface UIOverlayProps {
   gameState: GameState;
@@ -461,19 +462,7 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
         )}
       </main>
 
-      <footer className="pointer-events-auto px-4 pb-4 md:px-6 md:pb-6">
-        <div className="glass-card flex flex-col gap-2 rounded-2xl border border-white/10 px-4 py-3 text-xs text-slate-300 md:flex-row md:items-center md:justify-between">
-          <span>Desenvolvido por Matheus Siqueira</span>
-          <a
-            href="https://www.matheussiqueira.dev"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-full border border-white/15 px-3 py-1 text-xs uppercase tracking-[0.2em] text-white transition hover:border-amber-300/70"
-          >
-            Website
-          </a>
-        </div>
-      </footer>
+      <ProjectCredits />
     </div>
   );
 };

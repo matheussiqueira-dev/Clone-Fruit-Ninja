@@ -80,7 +80,7 @@ const GameLayer: React.FC<GameLayerProps> = ({
   const spawnAccumulatorRef = useRef(0);
   const lastFrameRef = useRef<number | null>(null);
   const lastSliceTimeRef = useRef<number>(-Infinity);
-  const requestRef = useRef<number>();
+  const requestRef = useRef<number | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
