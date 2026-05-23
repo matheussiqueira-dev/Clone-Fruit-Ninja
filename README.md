@@ -225,4 +225,4 @@ npm run build:server
 - e2e tests com Playwright.
 
 Autoria: Matheus Siqueira  
-Website: https://www.matheussiqueira.dev/
+Créditos obrigatórios: Matheus Siqueira — www.matheussiqueira.dev

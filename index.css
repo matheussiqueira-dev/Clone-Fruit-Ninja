@@ -5,6 +5,17 @@
 @tailwind utilities;
 
 :root {
+  --ms-bg: #040711;
+  --ms-surface: #0a1324;
+  --ms-surface-soft: #111827;
+  --ms-border: rgba(34, 211, 238, 0.22);
+  --ms-primary: #22d3ee;
+  --ms-primary-soft: rgba(34, 211, 238, 0.12);
+  --ms-text: #f8fafc;
+  --ms-muted: #94a3b8;
+  --ms-success: #34d399;
+  --ms-warning: #fbbf24;
+  --ms-danger: #fb7185;
   --bg-deep: #040711;
   --bg-soft: #0a1324;
   --glass: rgba(8, 14, 28, 0.65);

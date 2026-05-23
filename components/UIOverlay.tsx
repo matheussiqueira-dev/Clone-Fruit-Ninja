@@ -463,7 +463,7 @@ const UIOverlay: React.FC<UIOverlayProps> = ({
 
       <footer className="pointer-events-auto px-4 pb-4 md:px-6 md:pb-6">
         <div className="glass-card flex flex-col gap-2 rounded-2xl border border-white/10 px-4 py-3 text-xs text-slate-300 md:flex-row md:items-center md:justify-between">
-          <span>Desenvolvido por Matheus Siqueira</span>
+          <span>Matheus Siqueira — www.matheussiqueira.dev</span>
           <a
             href="https://www.matheussiqueira.dev"
             target="_blank"
