@@ -5,7 +5,14 @@
 @tailwind utilities;
 
 :root {
+  --bg-deep: #040711;
+  --bg-soft: #0a1324;
   --surface-soft: #111827;
+  --glass: rgba(8, 14, 28, 0.65);
+  --text-main: #f8fbff;
+  --text-muted: #b6c2d4;
+  --accent-gold: #f7cb67;
+  --accent-cyan: #6ad6f5;
   --border-tech: rgba(34, 211, 238, 0.22);
   --primary-soft: rgba(34, 211, 238, 0.12);
   --text-secondary: #94a3b8;
@@ -22,13 +29,6 @@
   --ms-success: var(--success);
   --ms-warning: var(--accent-gold);
   --ms-danger: var(--danger);
-  --bg-deep: #040711;
-  --bg-soft: #0a1324;
-  --glass: rgba(8, 14, 28, 0.65);
-  --text-main: #f8fbff;
-  --text-muted: #b6c2d4;
-  --accent-gold: #f7cb67;
-  --accent-cyan: #6ad6f5;
   color-scheme: dark;
 }
 
