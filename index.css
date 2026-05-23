@@ -5,17 +5,23 @@
 @tailwind utilities;
 
 :root {
+  --surface-soft: #111827;
+  --border-tech: rgba(34, 211, 238, 0.22);
+  --primary-soft: rgba(34, 211, 238, 0.12);
+  --text-secondary: #94a3b8;
+  --success: #34d399;
+  --danger: #fb7185;
   --ms-bg: var(--bg-deep);
   --ms-surface: var(--bg-soft);
-  --ms-surface-soft: #111827;
-  --ms-border: rgba(34, 211, 238, 0.22);
+  --ms-surface-soft: var(--surface-soft);
+  --ms-border: var(--border-tech);
   --ms-primary: var(--accent-cyan);
-  --ms-primary-soft: rgba(34, 211, 238, 0.12);
+  --ms-primary-soft: var(--primary-soft);
   --ms-text: var(--text-main);
-  --ms-muted: #94a3b8;
-  --ms-success: #34d399;
+  --ms-muted: var(--text-secondary);
+  --ms-success: var(--success);
   --ms-warning: var(--accent-gold);
-  --ms-danger: #fb7185;
+  --ms-danger: var(--danger);
   --bg-deep: #040711;
   --bg-soft: #0a1324;
   --glass: rgba(8, 14, 28, 0.65);
