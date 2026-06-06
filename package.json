@@ -16,10 +16,10 @@
     "test:run": "vitest run"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "helmet": "^8.1.0",
-    "@mediapipe/tasks-vision": "^0.10.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },
@@ -32,6 +32,6 @@
     "tsx": "^4.20.3",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
-    "vitest": "^2.1.0"
+    "vitest": "^4.1.8"
   }
 }
