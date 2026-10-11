@@ -6,7 +6,7 @@ export default defineConfig(({ mode }) => {
     return {
       server: {
         port: 3000,
-        host: '0.0.0.0',
+        host: 'localhost',
         proxy: {
           '/api/v1': {
             target: 'http://localhost:3333',
