@@ -1,230 +1,117 @@
-# Fruit Ninja - Shadow Dojo
+# Shadow Dojo
 
-Jogo web interativo de corte com rastreamento de mão em tempo real (MediaPipe) e modo alternativo por mouse/trackpad, agora evoluído com arquitetura em camadas, leaderboard com API versionada e experiência visual de nível produção.
+Jogo de corte no navegador: corte frutas com a ponta do indicador diante da webcam ou com o mouse. Inspirado em Fruit Ninja, sem afiliação.
 
-## Visão geral
+[![Case no portfólio](https://img.shields.io/badge/Case-Portf%C3%B3lio-000000?style=for-the-badge&logo=googlechrome&logoColor=white)](https://www.matheussiqueira.dev/pt-BR/projects/fruit-ninja)
+[![Código](https://img.shields.io/badge/C%C3%B3digo-GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/matheussiqueira-dev/Clone-Fruit-Ninja)
 
-### Propósito do produto
-Entregar uma experiência de gameplay rápida, responsiva e intuitiva, com foco em:
-- Alta sensação de controle (precisão do corte).
-- Recompensa por habilidade (combo, acurácia, ranking).
-- Baixa fricção de entrada (fallback para mouse sem câmera).
+## Como se joga
 
-### Público-alvo
-- Jogadores casuais em desktop.
-- Usuários sem hardware avançado de câmera.
-- Portfólio técnico para demonstração de engenharia fullstack + UX/UI.
+- Frutas sobem do fundo do palco. Corte com um movimento: o cursor ou o dedo parado não corta.
+- Cortes em sequência rápida formam combos de até x5, que multiplicam os pontos.
+- Cortar uma bomba (a esfera com anel tracejado) encerra a partida. Três frutas no chão também.
+- A fruta cortada se parte em duas metades na direção exata do corte.
 
-## Principais melhorias implementadas
+### Modos
 
-### Arquitetura e estrutura
-- Refatoração do `App.tsx` para orquestração limpa via hooks especializados.
-- Separação explícita de responsabilidades:
-  - `hooks/useCameraController.ts` para ciclo de vida da câmera.
-  - `hooks/useHandTracking.ts` e `hooks/usePointerTracking.ts` para entradas.
-  - `hooks/useGameHotkeys.ts` para acessibilidade por teclado.
-  - `hooks/useLeaderboard.ts` + `services/leaderboardService.ts` para dados de ranking.
-- Centralização de constantes e defaults em `config/gameConfig.ts`.
-- Validação/normalização de leaderboard reutilizável em `lib/leaderboard.ts` (DRY).
+| Modo | Como funciona | Requisitos |
+|---|---|---|
+| Câmera | O [HandLandmarker do MediaPipe](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker) rastreia a ponta do indicador (landmark 8). O vídeo é processado no navegador e não é enviado. | Webcam, HTTPS (ou localhost), boa iluminação |
+| Mouse | Arraste o cursor (ou o dedo, em telas de toque) sobre as frutas. | Nenhum |
 
-### Frontend + UX/UI
-- Redesign completo da interface com novo design system visual:
-  - Tokens visuais em `index.css` (cores, glassmorphism, tipografia, atmosfera).
-  - Layout responsivo e hierarquia de informação aprimorada.
-  - Painel de ranking no menu e no game over.
-- Melhorias de acessibilidade:
-  - Atalhos de teclado (`Enter`, `M`, `R`).
-  - `aria-live` para feedback de status/erros.
-  - Estados de foco visíveis e melhores affordances.
-- Melhorias de performance:
-  - `devicePixelRatio` limitado no canvas para reduzir custo em telas de alta densidade.
-  - Loop do canvas pausado fora do estado de jogo.
-  - Controle de resize com `requestAnimationFrame`.
+Atalhos: `Enter` começa, `M` troca o modo e `R` atualiza os resultados.
 
-### Backend, APIs, dados e segurança
-- Criação de backend dedicado para ranking em `server/`.
-- API REST versionada: `/api/v1/leaderboard`.
-- Segurança reforçada:
-  - `helmet` para hardening de headers.
-  - CORS configurável por ambiente (`CORS_ORIGIN`).
-  - Rate limiting in-memory por IP.
-  - Validação de payload com regras de domínio.
-- Persistência em arquivo JSON com fila de escrita para evitar race conditions.
-- Contrato OpenAPI em `server/openapi.yaml`.
+### Limites conhecidos
 
-### Novas features
-- Leaderboard persistente com integração frontend-backend.
-- Fallback automático para leaderboard local (`localStorage`) quando a API estiver indisponível.
-- Salvamento de alias do jogador para reutilização em novas partidas.
+- O modelo rastreia uma mão só. Pouca luz ou fundo com a cor da pele reduzem a precisão.
+- Na primeira vez, o modo câmera baixa o modelo (7,8 MB) e o runtime WASM (cerca de 11 MB), servidos pelo próprio site.
+- Sem câmera, com a permissão negada, com a câmera em uso ou se o modelo não carregar, o jogo mostra uma mensagem própria e o modo mouse continua disponível.
 
-### Qualidade e boas práticas
-- Testes unitários e de domínio adicionados/expandidos:
-  - `lib/gameLogic.test.ts`
-  - `lib/leaderboard.test.ts`
-  - `server/src/domain/leaderboardRepository.test.ts`
-- Build e testes validados localmente com sucesso.
+## Onde ficam os resultados
 
-## Arquitetura técnica
+Sem uma API configurada, que é o caso do deploy estático, os resultados ficam **neste navegador** (`localStorage`). A tela diz isso ("Seus melhores resultados · Salvo neste navegador").
 
-### Frontend (React + TypeScript)
-- **Camada de apresentação**: `components/`
-- **Camada de aplicação**: `App.tsx` + hooks de orquestração
-- **Camada de domínio**: `lib/gameLogic.ts` e `lib/leaderboard.ts`
-- **Camada de infraestrutura**: `services/visionService.ts` e `services/leaderboardService.ts`
+O servidor opcional em `server/` (Express) oferece um ranking compartilhado para desenvolvimento local. Ele grava num arquivo JSON e não roda numa hospedagem estática.
 
-### Backend (Node + Express)
-- **Entrada HTTP**: `server/src/server.ts`
-- **Middleware transversal**: `server/src/middleware/rateLimiter.ts`
-- **Domínio/persistência**: `server/src/domain/leaderboardRepository.ts`
-- **Contrato**: `server/openapi.yaml`
+## Stack
 
-## Stack e tecnologias
+- React 19, TypeScript 5.8 e Vite 6.
+- Tailwind CSS 3 mapeado para o design system compartilhado `ms-tokens.css` v1.0, com IBM Plex Sans servida pelo próprio site.
+- MediaPipe Tasks Vision 0.10.32, com WASM e modelo em `public/vision/` (Apache 2.0, Google).
+- Express 4 + Helmet no servidor opcional de ranking.
+- Vitest (unitários) e Playwright + axe (ponta a ponta e acessibilidade).
 
-### Frontend
-- React 19
-- TypeScript
-- Vite
-- Tailwind CSS
-- MediaPipe Tasks Vision
+## Rodar localmente
 
-### Backend
-- Node.js
-- Express
-- Helmet
-- CORS
+Pré-requisitos: Node.js 20+ e npm 10+.
 
-### Qualidade
-- Vitest
-
-## Estrutura do projeto
-
-```text
-.
-|-- App.tsx
-|-- components/
-|   |-- GameLayer.tsx
-|   `-- UIOverlay.tsx
-|-- config/
-|   `-- gameConfig.ts
-|-- hooks/
-|   |-- useCameraController.ts
-|   |-- useGameHotkeys.ts
-|   |-- useHandTracking.ts
-|   |-- useLeaderboard.ts
-|   |-- useLocalStorage.ts
-|   |-- usePointerTracking.ts
-|   |-- useReducedMotion.ts
-|   `-- useWindowSize.ts
-|-- lib/
-|   |-- gameLogic.ts
-|   |-- gameLogic.test.ts
-|   |-- leaderboard.ts
-|   `-- leaderboard.test.ts
-|-- services/
-|   |-- leaderboardService.ts
-|   |-- senseiService.ts
-|   `-- visionService.ts
-|-- server/
-|   |-- data/leaderboard.json
-|   |-- openapi.yaml
-|   `-- src/
-|       |-- domain/leaderboardRepository.ts
-|       |-- middleware/rateLimiter.ts
-|       `-- server.ts
-`-- types.ts
-```
-
-## Instalação e execução
-
-### Pré-requisitos
-- Node.js 20+
-- npm 10+
-
-### Instalação
 ```bash
-npm install
-```
-
-### Rodar frontend
-```bash
+npm ci
 npm run dev
 ```
 
-### Rodar backend (ranking)
+O jogo abre em `http://localhost:3000`. Para o ranking compartilhado local, rode em outro terminal:
+
 ```bash
 npm run dev:server
 ```
 
-### Rodar frontend + backend
-- Terminal 1: `npm run dev`
-- Terminal 2: `npm run dev:server`
+Em `localhost`, o jogo usa esse servidor (`/api/v1`). Se ele não estiver rodando, os resultados ficam no navegador e o painel avisa.
 
 ### Variáveis de ambiente
-Copie `.env.example` e ajuste se necessário:
 
-```env
-VITE_LEADERBOARD_API_URL=/api/v1
-PORT=3333
-# CORS_ORIGIN=http://localhost:3000
-```
+Veja `.env.example`. No deploy estático, deixe `VITE_LEADERBOARD_API_URL` vazia: assim os resultados ficam no navegador.
 
-## API (resumo)
+| Variável | Onde | Uso |
+|---|---|---|
+| `VITE_LEADERBOARD_API_URL` | build do front | URL de uma API de ranking. Vazia = resultados no navegador (exceto em localhost) |
+| `PORT` | servidor opcional | Porta do Express (padrão 3333) |
+| `CORS_ORIGIN` | servidor opcional | Origens permitidas, separadas por vírgula |
 
-### `GET /api/v1/health`
-Healthcheck do serviço.
+## Qualidade
 
-### `GET /api/v1/leaderboard?limit=10`
-Retorna ranking ordenado por score/acurácia/combo.
-
-### `POST /api/v1/leaderboard`
-Payload:
-
-```json
-{
-  "player": "Matheus",
-  "score": 120,
-  "accuracy": 87,
-  "maxCombo": 5,
-  "inputMode": "camera"
-}
-```
-
-Contrato completo em `server/openapi.yaml`.
-
-## Testes e validação
-
-### Testes
 ```bash
-npm run test:run
+npm run typecheck   # tsc --noEmit
+npm test            # Vitest
+npm run build       # build de produção em dist/
+npm run e2e         # Playwright (Edge local; Chromium no CI)
 ```
 
-### Build frontend
-```bash
-npm run build
+- O CI (`.github/workflows/ci.yml`) roda typecheck, testes, build, build do servidor, audit e a suíte de ponta a ponta em cada PR.
+- A suíte de ponta a ponta cobre a partida no modo mouse, o cursor parado, o salvamento local e as falhas de câmera (simuladas). O axe roda no menu e no fim de jogo em 320, 768 e 1280 px.
+- O `npm audit` não aponta nenhum alerta crítico. Os alertas altos restantes vêm da cadeia de build do Tailwind 3 (`braces`, `micromatch`, `chokidar`, `fast-glob`): negação de serviço por padrões glob, que só roda no build e com a configuração do próprio repositório. Corrigir exige migrar para o Tailwind 4.
+- O `ms-tokens.css` é copiado do padrão, sem edição. Um teste confere o SHA-256 dele.
+
+## Deploy
+
+Site estático na Vercel (`vercel.json`): build `npm run build`, saída `dist/`. Os headers incluem uma CSP que permite o WASM (`'wasm-unsafe-eval'`) e `Permissions-Policy: camera=(self)`.
+
+## Estrutura
+
+```text
+App.tsx                 shell: header, HUD, palco, telas e rodapé
+components/             telas (menu, carregamento, fim de jogo), HUD, ajustes, ranking, canvas do jogo
+config/                 regras do jogo, paleta de arte do canvas, links do projeto
+hooks/                  câmera, rastreamento de mão e ponteiro, ranking, atalhos
+lib/                    lógica pura testada (física, combos, câmera, estatísticas, ranking)
+services/               visão computacional (MediaPipe) e ranking (local ou API)
+server/                 servidor opcional de ranking (Express) e contrato OpenAPI
+styles/ms-tokens.css    design system compartilhado (não editar)
+e2e/                    testes Playwright
+public/vision/          runtime WASM e modelo do MediaPipe
 ```
 
-### Build backend
-```bash
-npm run build:server
-```
+---
 
-## Boas práticas adotadas
-- Separação de responsabilidades por camada.
-- Princípios DRY (normalização/validação compartilhada).
-- Fallback resiliente para indisponibilidade de API.
-- Tratamento de erro explícito no frontend e backend.
-- Acessibilidade e responsividade como requisitos de primeira classe.
-- Segurança mínima para produção (CORS, helmet, rate limiting, validação).
+### Desenvolvido por Matheus Siqueira
 
-## Possíveis melhorias futuras
-- Autenticação e perfis de jogador (JWT/session).
-- Banco de dados relacional (PostgreSQL) para leaderboard persistente.
-- WebSockets para ranking em tempo real.
-- Observabilidade (logs estruturados, métricas e tracing).
-- Modos adicionais de jogo (Time Attack, Zen, Daily Challenge).
-- e2e tests com Playwright.
+**Analista de Dados & BI | Power BI • SQL • Python • DAX | ETL, Modelagem de Dados, KPIs e Automação**
 
-## Créditos
+Conecte-se e acesse meus projetos:
 
-Desenvolvido por Matheus Siqueira.  
-Portfólio: https://www.matheussiqueira.dev
+[![Portfólio](https://img.shields.io/badge/Portf%C3%B3lio-matheussiqueira.dev-000000?style=for-the-badge&logo=googlechrome&logoColor=white)](https://www.matheussiqueira.dev)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Matheus_Siqueira-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/matheussiqueira-dev)
+[![GitHub](https://img.shields.io/badge/GitHub-matheussiqueira--dev-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/matheussiqueira-dev)
+[![E-mail](https://img.shields.io/badge/E--mail-hellomatheusdev%40gmail.com-EA4335?style=for-the-badge&logo=gmail&logoColor=white)](mailto:hellomatheusdev@gmail.com)
+
+<sub>Design system compartilhado ms-tokens v1.0 · IBM Plex Sans</sub>
