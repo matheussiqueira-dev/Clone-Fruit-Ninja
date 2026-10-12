@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Fruit Ninja Leaderboard API
+  title: Shadow Dojo Leaderboard API
   version: 1.0.0
   description: API para salvar e consultar ranking do jogo.
 servers:
