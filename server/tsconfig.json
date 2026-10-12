@@ -11,11 +11,16 @@
     "sourceMap": true,
     "allowJs": false,
     "allowImportingTsExtensions": false,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
   "include": [
     "src/**/*.ts",
     "../lib/leaderboard.ts",
     "../types.ts"
+  ],
+  "exclude": [
+    "src/**/*.test.ts"
   ]
 }
