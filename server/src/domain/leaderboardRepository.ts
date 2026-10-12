@@ -11,7 +11,7 @@ interface LeaderboardRepository {
   add: (submission: LeaderboardSubmission) => Promise<LeaderboardEntry[]>;
 }
 
-const DEFAULT_PATH = path.resolve(process.cwd(), 'server', 'data', 'leaderboard.json');
+const DEFAULT_PATH = path.resolve(process.cwd(), 'server', 'data', 'leaderboard.runtime.json');
 
 const ensureDataFile = async (filePath: string) => {
   const directory = path.dirname(filePath);
