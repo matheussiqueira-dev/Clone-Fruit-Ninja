@@ -87,3 +87,34 @@ test('swiping slices fruit and the result is saved in this browser', async ({ pa
   await expect(page.getByText('Resultado salvo neste navegador.')).toBeVisible();
   await expect(page.getByRole('listitem').filter({ hasText: 'Playwright' })).toBeVisible();
 });
+
+test('a one-letter name asks for at least two characters and a saved result cannot be saved twice', async ({ page }) => {
+  await startPointerGame(page);
+  const stage = await stageBox(page);
+  await page.mouse.move(stage.x + 2, stage.y + 2);
+  await expect(page.getByRole('heading', { level: 1, name: 'Fim de jogo' })).toBeVisible({ timeout: 30_000 });
+
+  const field = page.getByLabel('Nome no ranking');
+  await field.fill('A');
+  await page.getByRole('button', { name: 'Salvar resultado' }).click();
+  await expect(page.getByText('Use pelo menos 2 caracteres ou deixe o campo vazio.')).toBeVisible();
+  await expect(field).toHaveAttribute('aria-invalid', 'true');
+
+  await field.fill('Ana');
+  await page.getByRole('button', { name: 'Salvar resultado' }).click();
+  await expect(page.getByText('Resultado salvo neste navegador.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Resultado salvo' })).toBeDisabled();
+  await expect(page.getByRole('listitem').filter({ hasText: 'Ana' })).toHaveCount(1);
+});
+
+test('opening Ajustes pauses the round', async ({ page }) => {
+  await startPointerGame(page);
+  await page.getByRole('button', { name: 'Ajustes' }).click();
+  await expect(page.getByRole('dialog', { name: 'Ajustes' })).toBeVisible();
+  // Long enough for unsliced fruit to fall three times if the round kept running.
+  await page.waitForTimeout(8_000);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Ajustes' })).toBeHidden();
+  await expect(page.getByText('3 de 3')).toBeAttached();
+  await expect(page.getByRole('heading', { name: 'Fim de jogo' })).toHaveCount(0);
+});
