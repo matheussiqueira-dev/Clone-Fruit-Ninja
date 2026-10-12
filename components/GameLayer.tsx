@@ -29,6 +29,10 @@ interface GameLayerProps {
   handPositionRef: React.MutableRefObject<VisionResult | null>;
   gameState: GameState;
   settings: GameSettings;
+  // Freezes the round (settings open): no physics, no cutting.
+  paused: boolean;
+  // Reduced motion (A.7): no blade trail and no particles.
+  reducedMotion: boolean;
   maxLives: number;
   onStatsUpdate: (stats: Partial<GameStats>) => void;
   onGameOver: (finalScore: number, reason: GameOverReason) => void;
@@ -58,6 +62,8 @@ const SPLAT_LIFETIME = 1.5; // seconds until a juice splat has dried
 const MAX_DELTA = 0.05;
 const TRAIL_LIMIT = 14;
 const TRAIL_LIMIT_LOW_VFX = 8;
+// A jump this large between two samples is a new stroke (hand re-acquired, new touch), never a cut.
+const STROKE_BREAK_FRACTION = 0.25;
 
 const HAND_CONNECTIONS: Array<[number, number]> = [
   [0,1],[1,2],[2,3],[3,4],
@@ -213,6 +219,8 @@ const GameLayer: React.FC<GameLayerProps> = ({
   handPositionRef,
   gameState,
   settings,
+  paused,
+  reducedMotion,
   maxLives,
   onStatsUpdate,
   onGameOver,
@@ -241,7 +249,14 @@ const GameLayer: React.FC<GameLayerProps> = ({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || width <= 0 || height <= 0) return;
+    if (!canvas) return;
+    if (width <= 0 || height <= 0) {
+      // Outside a round the stage can be a long scrolling page: release the backing store.
+      canvas.width = 0;
+      canvas.height = 0;
+      ctxRef.current = null;
+      return;
+    }
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -293,6 +308,13 @@ const GameLayer: React.FC<GameLayerProps> = ({
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
       return;
     }
+    if (paused) {
+      // Keep the last frame on screen; on resume the clock and the blade start fresh.
+      lastFrameRef.current = null;
+      trailRef.current = [];
+      lastMoveAtRef.current = -Infinity;
+      return;
+    }
 
     const tokens = readCanvasTokens();
 
@@ -329,7 +351,7 @@ const GameLayer: React.FC<GameLayerProps> = ({
     };
 
     const createDrops = (x: number, y: number, color: string, count: number) => {
-      if (settings.lowVfx) return;
+      if (settings.lowVfx || reducedMotion) return;
       for (let i = 0; i < count; i++) {
         const angle = Math.random() * Math.PI * 2;
         const speed = (Math.random() * 5 + 2) * TARGET_FPS;
@@ -375,15 +397,19 @@ const GameLayer: React.FC<GameLayerProps> = ({
         drawSkeleton(ctx, handPosition.landmarks, width, height, tokens);
       }
 
-      if (handPosition) {
+      if (!handPosition) {
+        // Hand lost or touch lifted: the next sample starts a new stroke.
+        trailRef.current = [];
+      } else {
         const screenX = handPosition.x * width;
         const screenY = handPosition.y * height;
         const lastPoint = trailRef.current[trailRef.current.length - 1];
-        const moved = !lastPoint
-          || Math.hypot(lastPoint.x - screenX, lastPoint.y - screenY) >= MIN_BLADE_SEGMENT_PX;
-        if (moved) {
+        const jump = lastPoint ? Math.hypot(lastPoint.x - screenX, lastPoint.y - screenY) : 0;
+        if (!lastPoint || jump > Math.hypot(width, height) * STROKE_BREAK_FRACTION) {
+          trailRef.current = [{ x: screenX, y: screenY }];
+        } else if (jump >= MIN_BLADE_SEGMENT_PX) {
           trailRef.current.push({ x: screenX, y: screenY });
-          if (lastPoint) lastMoveAtRef.current = now;
+          lastMoveAtRef.current = now;
         }
         const trailLimit = settings.lowVfx ? TRAIL_LIMIT_LOW_VFX : TRAIL_LIMIT;
         if (trailRef.current.length > trailLimit) {
@@ -397,7 +423,7 @@ const GameLayer: React.FC<GameLayerProps> = ({
         trailRef.current.shift();
       }
 
-      if (settings.showTrail && trailRef.current.length > 1) {
+      if (settings.showTrail && !reducedMotion && trailRef.current.length > 1) {
         drawBlade(ctx, trailRef.current, tokens.blade, settings.lowVfx ? 6 : 9);
       }
 
@@ -553,7 +579,7 @@ const GameLayer: React.FC<GameLayerProps> = ({
     return () => {
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
     };
-  }, [gameState, width, height, settings, onStatsUpdate, onGameOver]);
+  }, [gameState, paused, reducedMotion, width, height, settings, onStatsUpdate, onGameOver]);
 
   return (
     <canvas

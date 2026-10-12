@@ -349,6 +349,10 @@
     cursor: pointer;
   }
 
+  .ms-switch[aria-disabled='true'] {
+    cursor: not-allowed;
+  }
+
   .ms-switch__track {
     position: relative;
     display: inline-flex;

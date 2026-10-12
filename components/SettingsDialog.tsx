@@ -7,6 +7,8 @@ export type SettingKey = keyof GameSettings;
 interface SettingsDialogProps {
   open: boolean;
   settings: GameSettings;
+  // Settings the system forces on (reduced motion); shown as on and not toggleable.
+  lockedOn: SettingKey[];
   onToggle: (key: SettingKey) => void;
   onClose: () => void;
 }
@@ -16,11 +18,11 @@ const SETTING_ROWS: Array<{ key: SettingKey; label: string; description: string 
   { key: 'showCameraFeed', label: 'Mostrar o vídeo', description: 'Exibe a câmera ao fundo durante a partida.' },
   { key: 'showHandSkeleton', label: 'Mostrar a mão', description: 'Desenha os pontos da mão para conferir o rastreamento.' },
   { key: 'showTrail', label: 'Rastro da lâmina', description: 'Mostra o traço do corte.' },
-  { key: 'lowVfx', label: 'Efeitos reduzidos', description: 'Sem gotas de suco; ligado sozinho com movimento reduzido no sistema.' }
+  { key: 'lowVfx', label: 'Efeitos reduzidos', description: 'Sem gotas de suco e com rastro mais curto.' }
 ];
 
 // Native <dialog> with showModal(): focus containment, Esc and top layer come from the browser (A.7 §12).
-const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, settings, onToggle, onClose }) => {
+const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, settings, lockedOn, onToggle, onClose }) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const titleId = useId();
@@ -53,13 +55,26 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, settings, onToggl
       </div>
       <ul className="mt-4 divide-y divide-line">
         {SETTING_ROWS.map(({ key, label, description }) => {
-          const checked = settings[key];
+          const locked = lockedOn.includes(key);
+          const checked = locked || settings[key];
           return (
             <li key={key}>
-              <button type="button" role="switch" aria-checked={checked} className="ms-switch" onClick={() => onToggle(key)}>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={checked}
+                aria-disabled={locked || undefined}
+                className="ms-switch"
+                onClick={() => {
+                  if (!locked) onToggle(key);
+                }}
+              >
                 <span className="min-w-0">
                   <span className="block text-small font-semibold text-fg">{label}</span>
                   <span className="block text-caption text-fg-secondary">{description}</span>
+                  {locked && (
+                    <span className="block text-caption text-fg-secondary">Mantido pelo movimento reduzido do sistema.</span>
+                  )}
                 </span>
                 <span className="flex flex-shrink-0 items-center gap-3">
                   <span className="text-caption text-fg-secondary" aria-hidden="true">{checked ? 'Ativo' : 'Inativo'}</span>

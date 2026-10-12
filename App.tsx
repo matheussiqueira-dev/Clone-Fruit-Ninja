@@ -62,19 +62,18 @@ const App: React.FC = () => {
   } = useCameraController();
 
   const leaderboard = useLeaderboard();
+  const submitLeaderboard = leaderboard.submit;
 
-  const resolvedSettings = useMemo(() => ({ ...DEFAULT_SETTINGS, ...settings }), [settings]);
+  // Reduced motion forces the low-effects mode without overwriting the stored preference.
+  const resolvedSettings = useMemo(
+    () => ({ ...DEFAULT_SETTINGS, ...settings, ...(prefersReducedMotion ? { lowVfx: true } : {}) }),
+    [settings, prefersReducedMotion]
+  );
   const isPlaying = gameState === GameState.PLAYING;
 
   useEffect(() => {
     gameStateRef.current = gameState;
   }, [gameState]);
-
-  useEffect(() => {
-    if (prefersReducedMotion) {
-      setSettings((prev) => ({ ...DEFAULT_SETTINGS, ...prev, lowVfx: true }));
-    }
-  }, [prefersReducedMotion, setSettings]);
 
   useEffect(() => {
     if (stats.score > bestScore) {
@@ -132,7 +131,9 @@ const App: React.FC = () => {
     setGameOverReason(reason);
     setGameState(GameState.GAME_OVER);
     setSenseiWisdom(getSenseiWisdom(finalScore));
-  }, []);
+    // No round in progress, no camera: the next round reopens it (no new prompt once allowed).
+    resetCamera();
+  }, [resetCamera]);
 
   const handleInputModeChange = useCallback((mode: InputMode) => {
     setInputMode(mode);
@@ -148,9 +149,6 @@ const App: React.FC = () => {
 
   const handleSaveScore = useCallback(async (playerName: string) => {
     const normalizedPlayer = playerName.trim();
-    if (normalizedPlayer) {
-      setPlayerAlias(normalizedPlayer);
-    }
 
     const payload: LeaderboardSubmission = {
       player: normalizedPlayer || 'Ninja',
@@ -160,8 +158,13 @@ const App: React.FC = () => {
       inputMode
     };
 
-    return leaderboard.submit(payload);
-  }, [inputMode, leaderboard, setPlayerAlias, stats.maxCombo, stats.missed, stats.score, stats.sliced]);
+    const scope = await submitLeaderboard(payload);
+    // Remember the name only once it was accepted.
+    if (normalizedPlayer) {
+      setPlayerAlias(normalizedPlayer);
+    }
+    return scope;
+  }, [inputMode, setPlayerAlias, stats.maxCombo, stats.missed, stats.score, stats.sliced, submitLeaderboard]);
 
   const refreshLeaderboard = leaderboard.refresh;
   useGameHotkeys({
@@ -217,11 +220,13 @@ const App: React.FC = () => {
             handPositionRef={handPositionRef}
             gameState={gameState}
             settings={resolvedSettings}
+            paused={settingsOpen}
+            reducedMotion={prefersReducedMotion}
             maxLives={MAX_LIVES}
             onStatsUpdate={handleStatsUpdate}
             onGameOver={handleGameOver}
-            width={stageSize.width}
-            height={stageSize.height}
+            width={isPlaying ? stageSize.width : 0}
+            height={isPlaying ? stageSize.height : 0}
           />
 
           {gameState === GameState.LOADING && <LoadingScreen cameraStatus={cameraStatus} />}
@@ -260,6 +265,7 @@ const App: React.FC = () => {
       <SettingsDialog
         open={settingsOpen}
         settings={resolvedSettings}
+        lockedOn={prefersReducedMotion ? ['lowVfx'] : []}
         onToggle={handleToggleSetting}
         onClose={() => setSettingsOpen(false)}
       />

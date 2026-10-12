@@ -32,14 +32,21 @@ export const usePointerTracking = ({ enabled, gameStateRef, handPositionRef, sta
 
     window.addEventListener('pointermove', updatePointer);
     window.addEventListener('pointerdown', updatePointer);
-    window.addEventListener('pointerup', updatePointer);
+    // A lifted finger is no longer on the stage; a mouse keeps hovering after the button is released.
+    const endTouch = (event: PointerEvent) => {
+      if (event.pointerType === 'touch') clearPointer();
+    };
+
+    window.addEventListener('pointerup', endTouch);
+    window.addEventListener('pointercancel', clearPointer);
     window.addEventListener('blur', clearPointer);
     document.documentElement.addEventListener('mouseleave', clearPointer);
 
     return () => {
       window.removeEventListener('pointermove', updatePointer);
       window.removeEventListener('pointerdown', updatePointer);
-      window.removeEventListener('pointerup', updatePointer);
+      window.removeEventListener('pointerup', endTouch);
+      window.removeEventListener('pointercancel', clearPointer);
       window.removeEventListener('blur', clearPointer);
       document.documentElement.removeEventListener('mouseleave', clearPointer);
     };
