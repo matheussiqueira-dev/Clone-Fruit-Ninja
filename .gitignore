@@ -33,3 +33,7 @@ dist-ssr
 
 # Leaderboard data written by the optional local server
 server/data/leaderboard.runtime.json
+
+# Playwright output
+test-results/
+playwright-report/
