@@ -10,11 +10,18 @@ interface HotkeysParams {
   onRefreshLeaderboard: () => void;
 }
 
+// Radios, checkboxes and buttons are not typing: shortcuts must keep working after picking a mode.
+const NON_TEXT_INPUT_TYPES = new Set(['radio', 'checkbox', 'button', 'submit', 'reset', 'range', 'color']);
+
 const isTypingContext = (target: EventTarget | null) => {
   if (!(target instanceof HTMLElement)) return false;
-  const tag = target.tagName.toLowerCase();
-  return tag === 'input' || tag === 'textarea' || target.isContentEditable;
+  if (target instanceof HTMLInputElement) return !NON_TEXT_INPUT_TYPES.has(target.type);
+  return target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || target.isContentEditable;
 };
+
+// Enter on a focused button activates that button; the global shortcut must not fire a second action.
+const isActivatableControl = (target: EventTarget | null) =>
+  target instanceof HTMLButtonElement || target instanceof HTMLAnchorElement;
 
 export const useGameHotkeys = ({
   gameState,
@@ -28,7 +35,7 @@ export const useGameHotkeys = ({
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTypingContext(event.target)) return;
 
-      if (event.key === 'Enter') {
+      if (event.key === 'Enter' && !isActivatableControl(event.target)) {
         if (gameState === GameState.MENU) {
           event.preventDefault();
           onStart();

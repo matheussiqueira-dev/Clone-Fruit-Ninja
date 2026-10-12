@@ -1,11 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getSenseiWisdom } from './services/senseiService';
 import GameLayer from './components/GameLayer';
-import UIOverlay from './components/UIOverlay';
+import GameHud from './components/GameHud';
+import GameOverScreen from './components/GameOverScreen';
+import LeaderboardPanel from './components/LeaderboardPanel';
+import LoadingScreen from './components/LoadingScreen';
+import MenuScreen from './components/MenuScreen';
+import SettingsDialog, { SettingKey } from './components/SettingsDialog';
+import SiteFooter from './components/SiteFooter';
+import SiteHeader from './components/SiteHeader';
 import { useLocalStorage } from './hooks/useLocalStorage';
-import { useWindowSize } from './hooks/useWindowSize';
+import { useElementSize } from './hooks/useElementSize';
 import { useReducedMotion } from './hooks/useReducedMotion';
 import {
+  GameOverReason,
   GameSettings,
   GameState,
   GameStats,
@@ -24,14 +32,18 @@ import { useHandTracking } from './hooks/useHandTracking';
 import { usePointerTracking } from './hooks/usePointerTracking';
 import { useLeaderboard } from './hooks/useLeaderboard';
 import { useGameHotkeys } from './hooks/useGameHotkeys';
+import { computeAccuracy } from './lib/stats';
 
 const App: React.FC = () => {
   const handPositionRef = useRef<VisionResult | null>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const [gameState, setGameState] = useState<GameState>(GameState.MENU);
   const gameStateRef = useRef(gameState);
 
   const [stats, setStats] = useState<GameStats>(INITIAL_STATS);
   const [senseiWisdom, setSenseiWisdom] = useState('');
+  const [gameOverReason, setGameOverReason] = useState<GameOverReason>('lives');
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [bestScore, setBestScore] = useLocalStorage<number>(STORAGE_KEYS.bestScore, 0);
   const [settings, setSettings] = useLocalStorage<GameSettings>(STORAGE_KEYS.settings, DEFAULT_SETTINGS);
@@ -39,28 +51,20 @@ const App: React.FC = () => {
   const [playerAlias, setPlayerAlias] = useLocalStorage<string>(STORAGE_KEYS.playerAlias, '');
 
   const prefersReducedMotion = useReducedMotion();
-  const windowSize = useWindowSize();
+  const stageSize = useElementSize(stageRef);
 
   const {
     videoRef,
     cameraStatus,
-    cameraError,
+    cameraFailure,
     prepareCamera,
-    stopCamera,
-    clearCameraError,
-    markCameraIdle
+    resetCamera
   } = useCameraController();
 
-  const {
-    entries: leaderboardEntries,
-    loading: isLeaderboardLoading,
-    submitting: isSubmittingScore,
-    error: leaderboardError,
-    refresh: refreshLeaderboard,
-    submit: submitLeaderboard
-  } = useLeaderboard();
+  const leaderboard = useLeaderboard();
 
   const resolvedSettings = useMemo(() => ({ ...DEFAULT_SETTINGS, ...settings }), [settings]);
+  const isPlaying = gameState === GameState.PLAYING;
 
   useEffect(() => {
     gameStateRef.current = gameState;
@@ -80,14 +84,12 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (inputMode === 'pointer') {
-      stopCamera();
-      markCameraIdle();
-      clearCameraError();
+      resetCamera();
     }
-  }, [inputMode, stopCamera, markCameraIdle, clearCameraError]);
+  }, [inputMode, resetCamera]);
 
   useHandTracking({
-    enabled: inputMode === 'camera' && cameraStatus === 'ready' && gameState === GameState.PLAYING,
+    enabled: inputMode === 'camera' && cameraStatus === 'ready' && isPlaying,
     mirror: resolvedSettings.mirrorVideo,
     inputMode,
     videoRef,
@@ -97,14 +99,15 @@ const App: React.FC = () => {
   usePointerTracking({
     enabled: inputMode === 'pointer',
     gameStateRef,
-    handPositionRef
+    handPositionRef,
+    stageRef
   });
 
   useEffect(() => {
-    if (gameState !== GameState.PLAYING) {
+    if (!isPlaying) {
       handPositionRef.current = null;
     }
-  }, [gameState]);
+  }, [isPlaying]);
 
   const handleStatsUpdate = useCallback((partial: Partial<GameStats>) => {
     setStats((prev) => ({ ...prev, ...partial }));
@@ -125,7 +128,8 @@ const App: React.FC = () => {
     setGameState(GameState.PLAYING);
   }, [inputMode, prepareCamera]);
 
-  const handleGameOver = useCallback((finalScore: number) => {
+  const handleGameOver = useCallback((finalScore: number, reason: GameOverReason) => {
+    setGameOverReason(reason);
     setGameState(GameState.GAME_OVER);
     setSenseiWisdom(getSenseiWisdom(finalScore));
   }, []);
@@ -134,8 +138,12 @@ const App: React.FC = () => {
     setInputMode(mode);
   }, [setInputMode]);
 
-  const handleSettingsChange = useCallback((nextSettings: GameSettings) => {
-    setSettings({ ...DEFAULT_SETTINGS, ...nextSettings });
+  // Functional update: rapid toggles never overwrite each other.
+  const handleToggleSetting = useCallback((key: SettingKey) => {
+    setSettings((prev) => {
+      const current = { ...DEFAULT_SETTINGS, ...prev };
+      return { ...current, [key]: !current[key] };
+    });
   }, [setSettings]);
 
   const handleSaveScore = useCallback(async (playerName: string) => {
@@ -144,20 +152,18 @@ const App: React.FC = () => {
       setPlayerAlias(normalizedPlayer);
     }
 
-    const attempts = stats.sliced + stats.missed;
-    const accuracy = attempts > 0 ? Math.round((stats.sliced / attempts) * 100) : 0;
-
     const payload: LeaderboardSubmission = {
       player: normalizedPlayer || 'Ninja',
       score: stats.score,
-      accuracy,
+      accuracy: computeAccuracy(stats.sliced, stats.missed),
       maxCombo: stats.maxCombo,
       inputMode
     };
 
-    await submitLeaderboard(payload);
-  }, [inputMode, setPlayerAlias, stats.maxCombo, stats.missed, stats.score, stats.sliced, submitLeaderboard]);
+    return leaderboard.submit(payload);
+  }, [inputMode, leaderboard, setPlayerAlias, stats.maxCombo, stats.missed, stats.score, stats.sliced]);
 
+  const refreshLeaderboard = leaderboard.refresh;
   useGameHotkeys({
     gameState,
     inputMode,
@@ -167,61 +173,95 @@ const App: React.FC = () => {
     onRefreshLeaderboard: refreshLeaderboard
   });
 
-  const showVideo = useMemo(() => {
-    return resolvedSettings.showCameraFeed && inputMode === 'camera' && cameraStatus === 'ready';
-  }, [resolvedSettings.showCameraFeed, inputMode, cameraStatus]);
+  const showVideo = resolvedSettings.showCameraFeed && inputMode === 'camera' && cameraStatus === 'ready';
+
+  const leaderboardPanel = (
+    <LeaderboardPanel
+      entries={leaderboard.entries}
+      scope={leaderboard.scope}
+      loading={leaderboard.loading}
+      remoteUnavailable={leaderboard.remoteUnavailable}
+      onRefresh={() => void refreshLeaderboard()}
+      headingId={`leaderboard-${gameState.toLowerCase()}`}
+    />
+  );
 
   return (
-    <div className="relative w-full h-screen overflow-hidden app-shell">
-      <div className="absolute inset-0 app-gradient" />
-      <div className="absolute inset-0 app-glow" />
-      <div className="absolute inset-0 app-grid" />
-      <div className="absolute inset-0 app-noise" />
+    // While playing the shell is locked to the viewport so the stage sits between HUD and footer;
+    // in the other screens the page scrolls normally, so every action stays reachable on small screens.
+    <div className={`flex flex-col ${isPlaying ? 'h-dvh overflow-hidden' : 'min-h-dvh'}`}>
+      <a className="ms-skip-link" href="#main-content">Pular para o conteúdo</a>
+      <SiteHeader />
 
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className={`absolute top-0 left-0 w-full h-full object-cover transition-opacity duration-500 ${
-          resolvedSettings.mirrorVideo ? 'scale-x-[-1]' : ''
-        } ${showVideo ? 'opacity-55' : 'opacity-0'}`}
-      />
+      <main id="main-content" tabIndex={-1} className="flex min-h-0 flex-1 flex-col">
+        {isPlaying && (
+          <>
+            <h1 className="sr-only">Partida em andamento</h1>
+            <GameHud stats={stats} maxLives={MAX_LIVES} onOpenSettings={() => setSettingsOpen(true)} />
+          </>
+        )}
 
-      <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-slate-950/70 via-slate-950/20 to-slate-950/85 pointer-events-none" />
+        <div ref={stageRef} className={`relative flex min-h-0 flex-1 flex-col ${isPlaying ? 'touch-none overflow-hidden' : ''}`}>
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            aria-hidden="true"
+            className={`pointer-events-none absolute inset-0 h-full w-full object-cover transition-opacity duration-reveal ${
+              resolvedSettings.mirrorVideo ? '-scale-x-100' : ''
+            } ${showVideo && isPlaying ? 'opacity-40' : 'opacity-0'}`}
+          />
 
-      <GameLayer
-        handPositionRef={handPositionRef}
-        gameState={gameState}
+          <GameLayer
+            handPositionRef={handPositionRef}
+            gameState={gameState}
+            settings={resolvedSettings}
+            maxLives={MAX_LIVES}
+            onStatsUpdate={handleStatsUpdate}
+            onGameOver={handleGameOver}
+            width={stageSize.width}
+            height={stageSize.height}
+          />
+
+          {gameState === GameState.LOADING && <LoadingScreen cameraStatus={cameraStatus} />}
+
+          {gameState === GameState.MENU && (
+            <MenuScreen
+              inputMode={inputMode}
+              cameraStatus={cameraStatus}
+              cameraFailure={cameraFailure}
+              bestScore={bestScore}
+              onInputModeChange={handleInputModeChange}
+              onStart={() => void handleStartGame()}
+              onOpenSettings={() => setSettingsOpen(true)}
+              leaderboard={leaderboardPanel}
+            />
+          )}
+
+          {gameState === GameState.GAME_OVER && (
+            <GameOverScreen
+              stats={stats}
+              bestScore={bestScore}
+              reason={gameOverReason}
+              senseiWisdom={senseiWisdom}
+              playerAlias={playerAlias}
+              isSubmitting={leaderboard.submitting}
+              onSave={handleSaveScore}
+              onRestart={() => void handleStartGame()}
+              leaderboard={leaderboardPanel}
+            />
+          )}
+        </div>
+      </main>
+
+      <SiteFooter />
+
+      <SettingsDialog
+        open={settingsOpen}
         settings={resolvedSettings}
-        maxLives={MAX_LIVES}
-        onStatsUpdate={handleStatsUpdate}
-        onGameOver={handleGameOver}
-        width={windowSize.width}
-        height={windowSize.height}
-      />
-
-      <UIOverlay
-        gameState={gameState}
-        stats={stats}
-        bestScore={bestScore}
-        maxLives={MAX_LIVES}
-        senseiWisdom={senseiWisdom}
-        cameraStatus={cameraStatus}
-        cameraError={cameraError}
-        inputMode={inputMode}
-        settings={resolvedSettings}
-        playerAlias={playerAlias}
-        leaderboardEntries={leaderboardEntries}
-        leaderboardError={leaderboardError}
-        isLeaderboardLoading={isLeaderboardLoading}
-        isSubmittingScore={isSubmittingScore}
-        onStart={handleStartGame}
-        onRestart={handleStartGame}
-        onInputModeChange={handleInputModeChange}
-        onSettingsChange={handleSettingsChange}
-        onRefreshLeaderboard={refreshLeaderboard}
-        onSaveScore={handleSaveScore}
+        onToggle={handleToggleSetting}
+        onClose={() => setSettingsOpen(false)}
       />
     </div>
   );

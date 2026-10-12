@@ -1,9 +1,19 @@
 {
-  "name": "fruit-ninja",
+  "name": "shadow-dojo",
   "private": true,
   "version": "0.0.0",
+  "description": "Jogo de corte no navegador com rastreamento de mão (MediaPipe) e modo mouse. Inspirado em Fruit Ninja, sem afiliação.",
   "type": "module",
-  "author": "Matheus Siqueira",
+  "author": "Matheus Siqueira <hellomatheusdev@gmail.com> (https://www.matheussiqueira.dev)",
+  "license": "MIT",
+  "homepage": "https://github.com/matheussiqueira-dev/Clone-Fruit-Ninja#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/matheussiqueira-dev/Clone-Fruit-Ninja.git"
+  },
+  "bugs": {
+    "url": "https://github.com/matheussiqueira-dev/Clone-Fruit-Ninja/issues"
+  },
   "scripts": {
     "dev": "vite",
     "dev:client": "vite",
@@ -12,21 +22,29 @@
     "build:server": "tsc -p server/tsconfig.json",
     "preview": "vite preview",
     "start:server": "tsx server/src/server.ts",
-    "test": "vitest",
-    "test:run": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "test:watch": "vitest",
+    "generate:favicon": "node scripts/generate-favicon.mjs",
+    "e2e": "playwright test"
   },
   "dependencies": {
+    "@fontsource-variable/ibm-plex-sans": "5.3.0",
     "@mediapipe/tasks-vision": "^0.10.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "helmet": "^8.1.0",
+    "lucide-react": "1.55.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.64.0",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.4.20",
+    "fontkit": "2.0.4",
     "postcss": "^8.5.4",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.20.3",
