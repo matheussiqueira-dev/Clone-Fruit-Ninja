@@ -1,0 +1,2 @@
+# Keep the shared design tokens byte-identical to the canonical file (SHA-256 checked in tests).
+styles/ms-tokens.css text eol=lf
