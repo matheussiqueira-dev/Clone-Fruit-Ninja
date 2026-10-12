@@ -1,5 +1,5 @@
 import React from 'react';
-import { Briefcase, CodeXml } from 'lucide-react';
+import { Briefcase, Code } from 'lucide-react';
 import { PRODUCT_NAME, PROJECT_LINKS } from '../config/project';
 
 // Shared shell header (padrao-projetos A.9). The product name here is a link, not the page h1.
@@ -22,7 +22,7 @@ const SiteHeader: React.FC = () => (
           rel="noopener noreferrer"
           title="Código"
         >
-          <CodeXml size={20} strokeWidth={1.75} aria-hidden="true" />
+          <Code size={20} strokeWidth={1.75} aria-hidden="true" />
           <span className="ms-nav-link__label">Código</span>
           <span className="ms-sr-only"> (abre em nova aba)</span>
         </a>
