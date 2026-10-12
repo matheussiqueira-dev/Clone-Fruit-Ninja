@@ -1,6 +1,8 @@
 import { STORAGE_KEYS } from '../config/gameConfig';
 import {
   LeaderboardEntry,
+  LeaderboardResult,
+  LeaderboardScope,
   LeaderboardSubmission
 } from '../types';
 import {
@@ -12,21 +14,26 @@ import {
 
 const REQUEST_TIMEOUT_MS = 3500;
 
-const getBaseApiUrl = () => {
-  const raw = import.meta.env.VITE_LEADERBOARD_API_URL;
-  if (typeof raw === 'string' && raw.trim()) {
-    return raw.replace(/\/$/, '');
+// Remote ranking only when an API is configured, or on localhost where `npm run dev:server` runs.
+// Static deploys (Vercel) have no API: results stay in this browser.
+export const resolveLeaderboardApiUrl = (envValue: unknown, hostname: string | undefined): string | null => {
+  if (typeof envValue === 'string' && envValue.trim()) {
+    return envValue.trim().replace(/\/$/, '');
   }
 
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1') {
-      return '/api/v1';
-    }
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return '/api/v1';
   }
 
   return null;
 };
+
+const getBaseApiUrl = () => resolveLeaderboardApiUrl(
+  import.meta.env.VITE_LEADERBOARD_API_URL,
+  typeof window !== 'undefined' ? window.location.hostname : undefined
+);
+
+export const getLeaderboardScope = (): LeaderboardScope => (getBaseApiUrl() ? 'remote' : 'local');
 
 const readLocalLeaderboard = () => {
   if (typeof window === 'undefined') return [];
@@ -89,24 +96,38 @@ const mergeLocalWithRemote = (remote: LeaderboardEntry[]) => {
   return snapshot;
 };
 
-export const fetchLeaderboard = async (limit: number): Promise<LeaderboardEntry[]> => {
+const createLocalEntry = (payload: LeaderboardSubmission): LeaderboardEntry => ({
+  id: typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  createdAt: new Date().toISOString(),
+  ...payload
+});
+
+const saveLocally = (payload: LeaderboardSubmission): LeaderboardResult => {
+  const merged = sortLeaderboard([createLocalEntry(payload), ...readLocalLeaderboard()]).slice(0, 50);
+  writeLocalLeaderboard(merged);
+  return { entries: merged, source: 'local' };
+};
+
+export const fetchLeaderboard = async (limit: number): Promise<LeaderboardResult> => {
   const baseApiUrl = getBaseApiUrl();
 
   if (!baseApiUrl) {
-    return readLocalLeaderboard().slice(0, limit);
+    return { entries: readLocalLeaderboard().slice(0, limit), source: 'local' };
   }
 
   try {
     const data = await requestJson<{ entries?: unknown }>(`${baseApiUrl}/leaderboard?limit=${limit}`);
     const normalized = normalizeLeaderboardEntries(data.entries ?? []);
-    return mergeLocalWithRemote(normalized).slice(0, limit);
+    return { entries: mergeLocalWithRemote(normalized).slice(0, limit), source: 'remote' };
   } catch (error) {
     console.warn('Leaderboard API unavailable, using local fallback:', error);
-    return readLocalLeaderboard().slice(0, limit);
+    return { entries: readLocalLeaderboard().slice(0, limit), source: 'local' };
   }
 };
 
-export const submitLeaderboardScore = async (payload: LeaderboardSubmission): Promise<LeaderboardEntry[]> => {
+export const submitLeaderboardScore = async (payload: LeaderboardSubmission): Promise<LeaderboardResult> => {
   if (!isValidLeaderboardSubmission(payload)) {
     throw new Error('Payload inválido para leaderboard.');
   }
@@ -115,17 +136,7 @@ export const submitLeaderboardScore = async (payload: LeaderboardSubmission): Pr
   const normalizedPayload = normalizeSubmission(payload);
 
   if (!baseApiUrl) {
-    const entry: LeaderboardEntry = {
-      id: typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      createdAt: new Date().toISOString(),
-      ...normalizedPayload
-    };
-
-    const merged = sortLeaderboard([entry, ...readLocalLeaderboard()]).slice(0, 50);
-    writeLocalLeaderboard(merged);
-    return merged;
+    return saveLocally(normalizedPayload);
   }
 
   try {
@@ -135,20 +146,9 @@ export const submitLeaderboardScore = async (payload: LeaderboardSubmission): Pr
     });
 
     const normalized = normalizeLeaderboardEntries(data.entries ?? []);
-    return mergeLocalWithRemote(normalized);
+    return { entries: mergeLocalWithRemote(normalized), source: 'remote' };
   } catch (error) {
     console.warn('Failed to submit score to API, keeping local only:', error);
-
-    const fallbackEntry: LeaderboardEntry = {
-      id: typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      createdAt: new Date().toISOString(),
-      ...normalizedPayload
-    };
-
-    const merged = sortLeaderboard([fallbackEntry, ...readLocalLeaderboard()]).slice(0, 50);
-    writeLocalLeaderboard(merged);
-    return merged;
+    return saveLocally(normalizedPayload);
   }
 };
