@@ -30,12 +30,12 @@ try {
 // stroke equal to the 400 -> 700 stem growth of IBM Plex Sans (~62 units per em).
 const STEM_GROWTH_UNITS = 62;
 const run = font.layout(MONOGRAM);
-const boldGlyphs = run.glyphs;
+const glyphs = run.glyphs;
 const scale = FONT_SIZE / font.unitsPerEm;
 const strokeWidth = STEM_GROWTH_UNITS * scale;
 // Extra spacing keeps the emboldened letters from touching.
 const letterSpacing = strokeWidth;
-const advance = boldGlyphs.reduce((total, glyph) => total + glyph.advanceWidth * scale + letterSpacing, -letterSpacing);
+const advance = glyphs.reduce((total, glyph) => total + glyph.advanceWidth * scale + letterSpacing, -letterSpacing);
 const capHeight = font.capHeight * scale;
 
 // Centre the letters horizontally and sit them above the accent bar.
@@ -43,7 +43,7 @@ const originX = (VIEWBOX - advance) / 2;
 const baselineY = 19.5;
 
 let penX = originX;
-const paths = boldGlyphs.map((glyph) => {
+const paths = glyphs.map((glyph) => {
   const path = glyph.path
     .scale(scale, -scale)
     .translate(penX, baselineY)

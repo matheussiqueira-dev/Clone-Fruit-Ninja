@@ -7,7 +7,7 @@ const SiteHeader: React.FC = () => (
   <header className="ms-header">
     <div className="ms-container ms-header__inner">
       <a className="ms-header__brand" href="/">
-        <img src="/favicon.svg" alt="" width={28} height={28} />
+        <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={28} height={28} />
         <span>{PRODUCT_NAME}</span>
       </a>
       <nav className="ms-header__nav" aria-label="Projeto">
