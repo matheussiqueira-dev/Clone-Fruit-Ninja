@@ -11,7 +11,11 @@ import {
   getBombChance,
   getSpawnInterval,
   getSpeedMultiplier,
+  isBladeActive,
+  planLaunch,
+  STAGE_GRAVITY,
   shouldResetCombo,
+  splitAlongCut,
   updateComboOnSlice
 } from './gameLogic';
 
@@ -80,5 +84,91 @@ describe('gameLogic', () => {
   it('applies miss and ends game at zero lives', () => {
     expect(applyMiss(3)).toEqual({ lives: 2, gameOver: false });
     expect(applyMiss(1)).toEqual({ lives: 0, gameOver: true });
+  });
+});
+
+describe('isBladeActive', () => {
+  it('cuts only right after the blade moved', () => {
+    expect(isBladeActive(1000, 1000)).toBe(true);
+    expect(isBladeActive(1000, 1080)).toBe(true);
+    expect(isBladeActive(1000, 1081)).toBe(false);
+  });
+
+  it('stays idle before the first movement or with a clock going backwards', () => {
+    expect(isBladeActive(-Infinity, 1000)).toBe(false);
+    expect(isBladeActive(Number.NaN, 1000)).toBe(false);
+    expect(isBladeActive(2000, 1000)).toBe(false);
+  });
+});
+
+describe('splitAlongCut', () => {
+  const body = { x: 100, y: 200, vx: 30, vy: -400 };
+  const dot = (ax: number, ay: number, bx: number, by: number) => ax * bx + ay * by;
+
+  it('returns two halves on opposite sides of the cut', () => {
+    const [a, b] = splitAlongCut(body, 10, 0);
+    expect(a.side).toBe(1);
+    expect(b.side).toBe(-1);
+    expect(a.cutAngle).toBeCloseTo(0);
+    expect(b.cutAngle).toBeCloseTo(0);
+  });
+
+  it('pushes the halves apart perpendicular to the cut, with opposite velocities', () => {
+    const cut = { dx: 3, dy: 4 };
+    const [a, b] = splitAlongCut(body, cut.dx, cut.dy, 50);
+    const da = { x: a.vx - body.vx, y: a.vy - body.vy };
+    const db = { x: b.vx - body.vx, y: b.vy - body.vy };
+
+    expect(dot(da.x, da.y, cut.dx, cut.dy)).toBeCloseTo(0);
+    expect(dot(db.x, db.y, cut.dx, cut.dy)).toBeCloseTo(0);
+    expect(da.x).toBeCloseTo(-db.x);
+    expect(da.y).toBeCloseTo(-db.y);
+    expect(Math.hypot(da.x, da.y)).toBeCloseTo(50);
+  });
+
+  it('follows the swipe direction for vertical cuts', () => {
+    const [a] = splitAlongCut(body, 0, 10);
+    expect(a.cutAngle).toBeCloseTo(Math.PI / 2);
+    expect(a.vy).toBeCloseTo(body.vy);
+    expect(a.vx).not.toBeCloseTo(body.vx);
+  });
+
+  it('falls back to a horizontal cut when the swipe has no length', () => {
+    const [a, b] = splitAlongCut(body, 0, 0, 20);
+    expect(a.cutAngle).toBe(0);
+    expect(a.vy - body.vy).toBeCloseTo(20);
+    expect(b.vy - body.vy).toBeCloseTo(-20);
+  });
+});
+
+describe('planLaunch', () => {
+  const apexOf = (vy: number, gravity = STAGE_GRAVITY) => (vy * vy) / (2 * gravity);
+
+  it('peaks at the requested fraction of the stage height', () => {
+    const plan = planLaunch({ startX: 100, targetX: 100, height: 500, apexFraction: 0.8 });
+    expect(plan.vy).toBeLessThan(0);
+    expect(apexOf(plan.vy)).toBeCloseTo(400);
+  });
+
+  it('scales with the stage so short screens still see the whole arc', () => {
+    const short = planLaunch({ startX: 0, targetX: 0, height: 300, apexFraction: 0.9 });
+    const tall = planLaunch({ startX: 0, targetX: 0, height: 900, apexFraction: 0.9 });
+    expect(apexOf(short.vy)).toBeLessThan(300);
+    expect(apexOf(tall.vy)).toBeLessThan(900);
+    expect(Math.abs(tall.vy)).toBeGreaterThan(Math.abs(short.vy));
+  });
+
+  it('lands on the target x when it returns to the launch line', () => {
+    const plan = planLaunch({ startX: 100, targetX: 700, height: 600, apexFraction: 0.6 });
+    expect(100 + plan.vx * plan.flightTime).toBeCloseTo(700);
+  });
+
+  it('clamps invalid heights and fractions', () => {
+    const zero = planLaunch({ startX: 0, targetX: 0, height: 0, apexFraction: 2 });
+    expect(Number.isFinite(zero.vy)).toBe(true);
+    expect(apexOf(zero.vy)).toBeLessThanOrEqual(1);
+    const nan = planLaunch({ startX: 0, targetX: 0, height: Number.NaN, apexFraction: Number.NaN });
+    expect(Number.isFinite(nan.vx)).toBe(true);
+    expect(Number.isFinite(nan.vy)).toBe(true);
   });
 });

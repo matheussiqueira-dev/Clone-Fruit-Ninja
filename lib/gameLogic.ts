@@ -100,3 +100,79 @@ export const applyMiss = (lives: number) => {
     gameOver: nextLives <= 0
   };
 };
+
+// The blade only cuts while it moves: a resting cursor or hand must not slice what flies into it.
+export const BLADE_IDLE_MS = 80;
+export const MIN_BLADE_SEGMENT_PX = 4;
+
+export const isBladeActive = (lastMoveAt: number, now: number, idleMs = BLADE_IDLE_MS) =>
+  Number.isFinite(lastMoveAt) && now >= lastMoveAt && now - lastMoveAt <= idleMs;
+
+export interface SplitHalf {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  // Angle of the cut line; the half covers the semicircle on its `side` of that line.
+  cutAngle: number;
+  side: 1 | -1;
+}
+
+// Splits a body along the cut direction: both halves keep the body's velocity and move apart
+// along the normal of the cut, so the gap always follows the swipe.
+export const splitAlongCut = (
+  body: { x: number; y: number; vx: number; vy: number },
+  cutDx: number,
+  cutDy: number,
+  separationSpeed = 90
+): [SplitHalf, SplitHalf] => {
+  const length = Math.hypot(cutDx, cutDy);
+  const cutAngle = length > 0 ? Math.atan2(cutDy, cutDx) : 0;
+  const nx = length > 0 ? -cutDy / length : 0;
+  const ny = length > 0 ? cutDx / length : 1;
+
+  const half = (side: 1 | -1): SplitHalf => ({
+    x: body.x + nx * side * 2,
+    y: body.y + ny * side * 2,
+    vx: body.vx + nx * side * separationSpeed,
+    vy: body.vy + ny * side * separationSpeed,
+    cutAngle,
+    side
+  });
+
+  return [half(1), half(-1)];
+};
+
+// Gravity of the fruit arc. The launch speed is derived from the stage height, so every fruit peaks
+// inside the stage and falls back into it at any screen size.
+export const STAGE_GRAVITY = 1200; // px/s^2: about 1.6-2.1 s of flight on common screens
+
+export interface LaunchPlan {
+  vx: number;
+  vy: number;
+  flightTime: number;
+}
+
+export const planLaunch = ({
+  startX,
+  targetX,
+  height,
+  apexFraction,
+  gravity = STAGE_GRAVITY
+}: {
+  startX: number;
+  targetX: number;
+  height: number;
+  // Peak height as a fraction of the stage height (0-1).
+  apexFraction: number;
+  gravity?: number;
+}): LaunchPlan => {
+  const safeHeight = Number.isFinite(height) ? Math.max(1, height) : 1;
+  const safeFraction = Number.isFinite(apexFraction) ? Math.min(0.98, Math.max(0.1, apexFraction)) : 0.7;
+  const apex = safeHeight * safeFraction;
+  const vy = -Math.sqrt(2 * gravity * apex);
+  // Time to rise and fall back to the launch line.
+  const flightTime = (2 * -vy) / gravity;
+  const vx = (targetX - startX) / flightTime;
+  return { vx, vy, flightTime };
+};
