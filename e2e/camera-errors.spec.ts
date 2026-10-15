@@ -9,11 +9,16 @@ const rejectCamera = async (page: Page, errorName: string) => {
   await page.addInitScript((name) => {
     const flag = window as unknown as { __cameraRequested: boolean };
     flag.__cameraRequested = false;
-    if (!navigator.mediaDevices) return;
-    navigator.mediaDevices.getUserMedia = () => {
+    const getUserMedia = () => {
       flag.__cameraRequested = true;
       return Promise.reject(new DOMException('simulated', name));
     };
+    // Some headless builds hide mediaDevices on the http test origin; provide it so only the simulated error varies.
+    if (navigator.mediaDevices) {
+      navigator.mediaDevices.getUserMedia = getUserMedia;
+    } else {
+      Object.defineProperty(navigator, 'mediaDevices', { value: { getUserMedia }, configurable: true });
+    }
   }, errorName);
 };
 
