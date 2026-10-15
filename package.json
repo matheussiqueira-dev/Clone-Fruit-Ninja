@@ -1,7 +1,7 @@
 {
   "name": "shadow-dojo",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Jogo de corte no navegador com rastreamento de mão (MediaPipe) e modo mouse.",
   "type": "module",
   "author": "Matheus Siqueira <hellomatheusdev@gmail.com> (https://www.matheussiqueira.dev)",

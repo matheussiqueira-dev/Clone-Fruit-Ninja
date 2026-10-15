@@ -2,6 +2,23 @@
 
 Todas as mudanças relevantes deste projeto. Formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), versões [SemVer](https://semver.org/lang/pt-BR/).
 
+## 0.2.0 - 2026-10-15
+
+### Adicionado
+- Desafio diário: a mesma sequência de frutas para todos no dia, com link `?desafio=AAAA-MM-DD`.
+- Painel "Seu desempenho" com as últimas 100 partidas: KPIs, tendência, gráfico acessível pelo teclado e tabela.
+- Compartilhar resultado pela folha de compartilhamento do aparelho ou pela área de transferência.
+- Tela de erro com "Recarregar" e registro central de erros inesperados.
+- Documento de evolução técnica e de produto em `docs/EVOLUCAO.md`.
+
+### Alterado
+- Motor do jogo extraído para `lib/engine`, puro e testado; o canvas só desenha.
+- TypeScript em modo `strict`, com os tipos do React, Express e CORS.
+- O código de visão computacional só é baixado no modo câmera (JS inicial 33% menor).
+
+### Corrigido
+- Os testes de câmera falhavam no Chromium do CI, que esconde `mediaDevices` na origem de teste.
+
 ## 0.1.0 - 2026-10-12
 
 ### Adicionado
