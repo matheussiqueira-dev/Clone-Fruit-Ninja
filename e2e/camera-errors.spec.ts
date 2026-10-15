@@ -1,7 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// Loading the hand model (WASM + 7.8 MB task file) can take a while on a cold cache.
-const CAMERA_SETUP_TIMEOUT = 30_000;
+// Loading the hand model (WASM + 7.8 MB task file) takes ~3 s alone, but much longer while other
+// workers run the game on the same CPU; the budget covers a cold, busy machine.
+const CAMERA_SETUP_TIMEOUT = 60_000;
+test.describe.configure({ timeout: 90_000 });
 
 // getUserMedia is replaced before the app loads, so each failure is reproducible without a real device.
 // window.__cameraRequested records whether the app ever asked for the camera.
