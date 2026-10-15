@@ -222,6 +222,7 @@ const App: React.FC = () => {
             settings={resolvedSettings}
             paused={settingsOpen}
             reducedMotion={prefersReducedMotion}
+            seed={null}
             maxLives={MAX_LIVES}
             onStatsUpdate={handleStatsUpdate}
             onGameOver={handleGameOver}
