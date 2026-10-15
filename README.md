@@ -21,6 +21,12 @@ Jogo de corte no navegador: corte frutas com a ponta do indicador diante da webc
 
 Atalhos: `Enter` começa, `M` troca o modo e `R` atualiza os resultados.
 
+### Desafio diário, desempenho e compartilhamento
+
+- **Desafio do dia:** a mesma sequência de frutas para todo mundo no mesmo dia, gerada por uma semente derivada da data. Um link `?desafio=AAAA-MM-DD` abre o desafio daquele dia; datas futuras ou inválidas caem no dia de hoje.
+- **Seu desempenho** (`#desempenho`): as últimas 100 partidas ficam neste navegador. O painel mostra partidas, melhor pontuação, média, precisão média e a evolução em gráfico, com navegação pelo teclado e uma tabela com os mesmos dados.
+- **Compartilhar:** no fim da partida, envia o resultado e o link pela folha de compartilhamento do aparelho ou copia para a área de transferência.
+
 ### Limites conhecidos
 
 - O modelo rastreia uma mão só. Pouca luz ou fundo com a cor da pele reduzem a precisão.
@@ -78,7 +84,8 @@ npm run e2e         # Playwright (Edge local; Chromium no CI)
 ```
 
 - O CI (`.github/workflows/ci.yml`) roda typecheck, testes, build, build do servidor, audit e a suíte de ponta a ponta em cada PR.
-- A suíte de ponta a ponta cobre a partida no modo mouse, o cursor parado, o salvamento local e as falhas de câmera (simuladas). O axe roda no menu e no fim de jogo em 320, 768 e 1280 px.
+- A suíte de ponta a ponta cobre a partida no modo mouse, o cursor parado, o salvamento local, as falhas de câmera (simuladas), o desafio diário, o painel de desempenho e o compartilhamento. O axe roda no menu, no fim de jogo e no painel em 320, 768 e 1280 px.
+- TypeScript em modo `strict` no front e no servidor.
 - O `npm audit` não aponta nenhum alerta crítico. Os alertas altos restantes vêm da cadeia de build do Tailwind 3 (`braces`, `micromatch`, `chokidar`, `fast-glob`): negação de serviço por padrões glob, que só roda no build e com a configuração do próprio repositório. Corrigir exige migrar para o Tailwind 4.
 - O `ms-tokens.css` é copiado do padrão, sem edição. Um teste confere o SHA-256 dele.
 
@@ -90,10 +97,12 @@ Site estático na Vercel (`vercel.json`): build `npm run build`, saída `dist/`.
 
 ```text
 App.tsx                 shell: header, HUD, palco, telas e rodapé
-components/             telas (menu, carregamento, fim de jogo), HUD, ajustes, ranking, canvas do jogo
+components/             telas (menu, carregamento, fim de jogo, desempenho), HUD, ajustes, ranking, canvas do jogo
+components/game/        renderização do canvas (só desenho)
 config/                 regras do jogo, paleta de arte do canvas, links do projeto
 hooks/                  câmera, rastreamento de mão e ponteiro, ranking, atalhos
-lib/                    lógica pura testada (física, combos, câmera, estatísticas, ranking)
+lib/engine/             motor do jogo puro e semeável (física, corte, pontuação, vidas)
+lib/                    lógica pura testada (histórico, compartilhamento, câmera, estatísticas, erros, ranking)
 services/               visão computacional (MediaPipe) e ranking (local ou API)
 server/                 servidor opcional de ranking (Express) e contrato OpenAPI
 styles/ms-tokens.css    design system compartilhado (não editar)
