@@ -69,6 +69,8 @@ describe('seeded randomness', () => {
     expect(dayKey(new Date(2026, 9, 5))).toBe('2026-10-05');
     expect(isDayKey('2026-10-15')).toBe(true);
     expect(isDayKey('2026-13-40')).toBe(false);
+    expect(isDayKey('2026-02-31')).toBe(false);
+    expect(isDayKey('2028-02-29')).toBe(true);
     expect(isDayKey('hoje')).toBe(false);
     expect(isDayKey(undefined)).toBe(false);
   });

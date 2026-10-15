@@ -30,5 +30,10 @@ const pad = (value: number) => String(value).padStart(2, '0');
 export const dayKey = (date: Date = new Date()): string =>
   `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 
-export const isDayKey = (value: unknown): value is string =>
-  typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00`));
+// A real calendar day: rejects 2026-02-31, which Date would silently roll into March.
+export const isDayKey = (value: unknown): value is string => {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+};
