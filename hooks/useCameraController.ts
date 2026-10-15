@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { CameraFailure, CameraStatus } from '../types';
-import { disposeVision, initializeVision } from '../services/visionService';
+import { getLoadedVision, loadVision } from '../services/visionLoader';
 import { VIDEO_CONSTRAINTS } from '../config/gameConfig';
 import { classifyCameraError, isCameraBusy } from '../lib/camera';
 
@@ -79,7 +79,8 @@ export const useCameraController = (): CameraController => {
 
     // The hand model loads before the permission prompt, so a model failure never asks for the camera.
     try {
-      await initializeVision();
+      const vision = await loadVision();
+      await vision.initializeVision();
     } catch (error) {
       console.error('Hand model failed to load:', error);
       fail('model-error');
@@ -111,7 +112,7 @@ export const useCameraController = (): CameraController => {
   useEffect(() => {
     return () => {
       stopCamera();
-      disposeVision();
+      getLoadedVision()?.disposeVision();
     };
   }, [stopCamera]);
 

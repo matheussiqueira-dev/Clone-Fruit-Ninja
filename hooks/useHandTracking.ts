@@ -1,6 +1,6 @@
 import { useEffect, type MutableRefObject } from 'react';
 import { InputMode, VisionResult } from '../types';
-import { detectHands } from '../services/visionService';
+import { getLoadedVision, loadVision } from '../services/visionLoader';
 
 interface HandTrackingParams {
   enabled: boolean;
@@ -25,9 +25,10 @@ export const useHandTracking = ({
     let animationFrameId: number | null = null;
     let videoFrameId: number | null = null;
     let cancelled = false;
+    let detectHands: NonNullable<ReturnType<typeof getLoadedVision>>['detectHands'] | null = null;
 
     const processFrame = () => {
-      if (cancelled) return;
+      if (cancelled || !detectHands) return;
 
       const video = videoRef.current;
       if (video) {
@@ -54,7 +55,20 @@ export const useHandTracking = ({
       animationFrameId = requestAnimationFrame(processFrame);
     };
 
-    schedule();
+    // The camera controller loaded the module before the camera became ready; load it here only as a fallback.
+    const loaded = getLoadedVision();
+    if (loaded) {
+      detectHands = loaded.detectHands;
+      schedule();
+    } else {
+      loadVision()
+        .then((vision) => {
+          if (cancelled) return;
+          detectHands = vision.detectHands;
+          schedule();
+        })
+        .catch((error: unknown) => console.error('Hand tracking could not start:', error));
+    }
 
     return () => {
       cancelled = true;
