@@ -9,6 +9,7 @@ import MenuScreen from './components/MenuScreen';
 import SettingsDialog, { SettingKey } from './components/SettingsDialog';
 import SiteFooter from './components/SiteFooter';
 import SiteHeader from './components/SiteHeader';
+import StatsScreen from './components/StatsScreen';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useElementSize } from './hooks/useElementSize';
 import { useReducedMotion } from './hooks/useReducedMotion';
@@ -33,6 +34,15 @@ import { usePointerTracking } from './hooks/usePointerTracking';
 import { useLeaderboard } from './hooks/useLeaderboard';
 import { useGameHotkeys } from './hooks/useGameHotkeys';
 import { computeAccuracy } from './lib/stats';
+import { dayKey, seedFromKey } from './lib/engine/rng';
+import { appendRun, bestForDay, normalizeHistory, RunMode, RunRecord } from './lib/history';
+import { readChallengeDay } from './lib/share';
+
+const STATS_HASH = '#desempenho';
+type MenuView = 'menu' | 'stats';
+
+const newRunId = () =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 const App: React.FC = () => {
   const handPositionRef = useRef<VisionResult | null>(null);
@@ -49,6 +59,19 @@ const App: React.FC = () => {
   const [settings, setSettings] = useLocalStorage<GameSettings>(STORAGE_KEYS.settings, DEFAULT_SETTINGS);
   const [inputMode, setInputMode] = useLocalStorage<InputMode>(STORAGE_KEYS.inputMode, 'camera');
   const [playerAlias, setPlayerAlias] = useLocalStorage<string>(STORAGE_KEYS.playerAlias, '');
+  const [storedHistory, setStoredHistory] = useLocalStorage<unknown>(STORAGE_KEYS.history, []);
+  const history = useMemo(() => normalizeHistory(storedHistory), [storedHistory]);
+
+  // Daily challenge: today's, or a past day opened from a shared link (?desafio=YYYY-MM-DD).
+  const [today] = useState(() => dayKey());
+  const [linkedDay] = useState(() => readChallengeDay(window.location.search, today));
+  const challengeDay = linkedDay ?? today;
+  const [runMode, setRunMode] = useState<RunMode>(linkedDay ? 'daily' : 'free');
+  // Fixed when a round starts, so switching the menu option never changes a round in progress.
+  const [roundDay, setRoundDay] = useState<string | null>(null);
+  const roundSeed = roundDay ? seedFromKey(roundDay) : null;
+
+  const [view, setView] = useState<MenuView>(() => (window.location.hash === STATS_HASH ? 'stats' : 'menu'));
 
   const prefersReducedMotion = useReducedMotion();
   const stageSize = useElementSize(stageRef);
@@ -108,6 +131,23 @@ const App: React.FC = () => {
     }
   }, [isPlaying]);
 
+  // The stats view has its own address, so the browser's back button returns to the menu.
+  useEffect(() => {
+    const syncView = () => setView(window.location.hash === STATS_HASH ? 'stats' : 'menu');
+    window.addEventListener('popstate', syncView);
+    return () => window.removeEventListener('popstate', syncView);
+  }, []);
+
+  const openStats = useCallback(() => {
+    window.history.pushState(null, '', `${window.location.pathname}${window.location.search}${STATS_HASH}`);
+    setView('stats');
+  }, []);
+
+  const closeStats = useCallback(() => {
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    setView('menu');
+  }, []);
+
   const handleStatsUpdate = useCallback((partial: Partial<GameStats>) => {
     setStats((prev) => ({ ...prev, ...partial }));
   }, []);
@@ -122,18 +162,36 @@ const App: React.FC = () => {
       }
     }
 
+    setRoundDay(runMode === 'daily' ? challengeDay : null);
     setStats({ ...INITIAL_STATS, lives: MAX_LIVES });
     setSenseiWisdom('');
+    if (view === 'stats') closeStats();
     setGameState(GameState.PLAYING);
-  }, [inputMode, prepareCamera]);
+  }, [inputMode, prepareCamera, runMode, challengeDay, view, closeStats]);
 
-  const handleGameOver = useCallback((finalScore: number, reason: GameOverReason) => {
+  const handleGameOver = useCallback((finalStats: GameStats, reason: GameOverReason) => {
     setGameOverReason(reason);
     setGameState(GameState.GAME_OVER);
-    setSenseiWisdom(getSenseiWisdom(finalScore));
+    setSenseiWisdom(getSenseiWisdom(finalStats.score));
+
+    const record: RunRecord = {
+      id: newRunId(),
+      at: new Date().toISOString(),
+      score: finalStats.score,
+      accuracy: computeAccuracy(finalStats.sliced, finalStats.missed),
+      maxCombo: finalStats.maxCombo,
+      sliced: finalStats.sliced,
+      missed: finalStats.missed,
+      inputMode,
+      mode: roundDay ? 'daily' : 'free',
+      ...(roundDay ? { day: roundDay } : {}),
+      reason
+    };
+    setStoredHistory((previous: unknown) => appendRun(normalizeHistory(previous), record));
+
     // No round in progress, no camera: the next round reopens it (no new prompt once allowed).
     resetCamera();
-  }, [resetCamera]);
+  }, [inputMode, resetCamera, roundDay, setStoredHistory]);
 
   const handleInputModeChange = useCallback((mode: InputMode) => {
     setInputMode(mode);
@@ -222,7 +280,7 @@ const App: React.FC = () => {
             settings={resolvedSettings}
             paused={settingsOpen}
             reducedMotion={prefersReducedMotion}
-            seed={null}
+            seed={roundSeed}
             maxLives={MAX_LIVES}
             onStatsUpdate={handleStatsUpdate}
             onGameOver={handleGameOver}
@@ -232,12 +290,21 @@ const App: React.FC = () => {
 
           {gameState === GameState.LOADING && <LoadingScreen cameraStatus={cameraStatus} />}
 
-          {gameState === GameState.MENU && (
+          {gameState === GameState.MENU && view === 'stats' && (
+            <StatsScreen history={history} onBack={closeStats} onPlay={() => void handleStartGame()} />
+          )}
+
+          {gameState === GameState.MENU && view === 'menu' && (
             <MenuScreen
               inputMode={inputMode}
               cameraStatus={cameraStatus}
               cameraFailure={cameraFailure}
               bestScore={bestScore}
+              runMode={runMode}
+              challengeDay={challengeDay}
+              dailyBest={bestForDay(history, challengeDay)}
+              onRunModeChange={setRunMode}
+              onOpenStats={openStats}
               onInputModeChange={handleInputModeChange}
               onStart={() => void handleStartGame()}
               onOpenSettings={() => setSettingsOpen(true)}
@@ -255,6 +322,12 @@ const App: React.FC = () => {
               isSubmitting={leaderboard.submitting}
               onSave={handleSaveScore}
               onRestart={() => void handleStartGame()}
+              challengeDay={roundDay}
+              dailyBest={roundDay ? bestForDay(history, roundDay) : null}
+              onOpenStats={() => {
+                setGameState(GameState.MENU);
+                openStats();
+              }}
               leaderboard={leaderboardPanel}
             />
           )}

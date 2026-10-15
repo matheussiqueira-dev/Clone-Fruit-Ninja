@@ -14,7 +14,8 @@ export const STORAGE_KEYS = {
   settings: 'fruit-ninja:settings',
   inputMode: 'fruit-ninja:input-mode',
   localLeaderboard: 'fruit-ninja:local-leaderboard',
-  playerAlias: 'fruit-ninja:player-alias'
+  playerAlias: 'fruit-ninja:player-alias',
+  history: 'fruit-ninja:history'
 } as const;
 
 export const DEFAULT_SETTINGS: GameSettings = {

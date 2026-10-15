@@ -17,7 +17,7 @@ interface GameLayerProps {
   seed: number | null;
   maxLives: number;
   onStatsUpdate: (stats: Partial<GameStats>) => void;
-  onGameOver: (finalScore: number, reason: GameOverReason) => void;
+  onGameOver: (finalStats: GameStats, reason: GameOverReason) => void;
   width: number;
   height: number;
 }
@@ -132,7 +132,7 @@ const GameLayer: React.FC<GameLayerProps> = ({
 
       if (result.stats) onStatsUpdate(result.stats);
       if (result.gameOver) {
-        onGameOver(engine.stats.score, result.gameOver);
+        onGameOver({ ...engine.stats }, result.gameOver);
         return;
       }
       requestRef.current = requestAnimationFrame(loop);

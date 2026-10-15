@@ -1,19 +1,27 @@
 import React from 'react';
-import { CircleAlert, LoaderCircle, Settings } from 'lucide-react';
+import { ChartLine, CircleAlert, LoaderCircle, Settings } from 'lucide-react';
 import { CameraFailure, CameraStatus, InputMode } from '../types';
 import { CAMERA_FAILURE_MESSAGES, getCameraStatusLabel, isCameraBusy } from '../lib/camera';
 import { formatInteger } from '../lib/stats';
 import { PRODUCT_NAME } from '../config/project';
 import { GAME_SHORTCUTS } from '../config/gameConfig';
+import { RunMode } from '../lib/history';
+import { formatDayShort } from '../lib/share';
 
 interface MenuScreenProps {
   inputMode: InputMode;
   cameraStatus: CameraStatus;
   cameraFailure: CameraFailure | null;
   bestScore: number;
+  runMode: RunMode;
+  // Challenge day (YYYY-MM-DD): today, or a past day opened from a shared link.
+  challengeDay: string;
+  dailyBest: number | null;
   onInputModeChange: (mode: InputMode) => void;
+  onRunModeChange: (mode: RunMode) => void;
   onStart: () => void;
   onOpenSettings: () => void;
+  onOpenStats: () => void;
   leaderboard: React.ReactNode;
 }
 
@@ -22,9 +30,14 @@ const MenuScreen: React.FC<MenuScreenProps> = ({
   cameraStatus,
   cameraFailure,
   bestScore,
+  runMode,
+  challengeDay,
+  dailyBest,
   onInputModeChange,
+  onRunModeChange,
   onStart,
   onOpenSettings,
+  onOpenStats,
   leaderboard
 }) => {
   const usingCamera = inputMode === 'camera';
@@ -73,6 +86,27 @@ const MenuScreen: React.FC<MenuScreenProps> = ({
           </label>
         </fieldset>
 
+        <fieldset className="flex flex-col gap-3">
+          <legend className="mb-3 text-small font-semibold text-fg">Tipo de partida</legend>
+          <label className="ms-choice">
+            <input type="radio" name="run-mode" value="free" checked={runMode === 'free'} onChange={() => onRunModeChange('free')} />
+            <span>
+              <span className="block text-small font-semibold text-fg">Livre</span>
+              <span className="block text-caption text-fg-secondary">Frutas sorteadas a cada partida.</span>
+            </span>
+          </label>
+          <label className="ms-choice">
+            <input type="radio" name="run-mode" value="daily" checked={runMode === 'daily'} onChange={() => onRunModeChange('daily')} />
+            <span>
+              <span className="block text-small font-semibold text-fg">Desafio de {formatDayShort(challengeDay)}</span>
+              <span className="block text-caption text-fg-secondary">
+                A mesma sequência de frutas para todo mundo neste dia.
+                {dailyBest !== null && <> Seu melhor: <span className="ms-num font-semibold text-fg">{formatInteger(dailyBest)}</span>.</>}
+              </span>
+            </span>
+          </label>
+        </fieldset>
+
         {usingCamera && cameraStatus === 'error' && cameraFailure && (
           <div className="ms-alert" role="alert">
             <CircleAlert size={20} strokeWidth={1.75} aria-hidden="true" className="ms-alert__icon" />
@@ -94,6 +128,10 @@ const MenuScreen: React.FC<MenuScreenProps> = ({
             <button type="button" className="ms-btn ms-btn--primary" onClick={onStart} disabled={busy} aria-busy={busy}>
               {busy && <LoaderCircle size={16} strokeWidth={1.75} aria-hidden="true" className="ms-spinner" />}
               {primaryLabel}
+            </button>
+            <button type="button" className="ms-btn ms-btn--ghost" onClick={onOpenStats}>
+              <ChartLine size={16} strokeWidth={1.75} aria-hidden="true" />
+              Seu desempenho
             </button>
             <button type="button" className="ms-btn ms-btn--secondary" onClick={onOpenSettings}>
               <Settings size={16} strokeWidth={1.75} aria-hidden="true" />

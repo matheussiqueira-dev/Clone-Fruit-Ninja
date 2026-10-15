@@ -2,6 +2,8 @@ import React, { useEffect, useId, useState } from 'react';
 import { GameOverReason, GameStats, LeaderboardScope } from '../types';
 import { computeAccuracy, formatInteger, formatPercent } from '../lib/stats';
 import { MAX_PLAYER_LENGTH, MIN_PLAYER_LENGTH, sanitizePlayerName } from '../lib/leaderboard';
+import { buildShareText, buildShareUrl, formatDayShort } from '../lib/share';
+import { ChartLine, Share2 } from 'lucide-react';
 
 interface GameOverScreenProps {
   stats: GameStats;
@@ -12,8 +14,29 @@ interface GameOverScreenProps {
   isSubmitting: boolean;
   onSave: (playerName: string) => Promise<LeaderboardScope>;
   onRestart: () => void;
+  // Set for daily challenge rounds.
+  challengeDay: string | null;
+  dailyBest: number | null;
+  onOpenStats: () => void;
   leaderboard: React.ReactNode;
 }
+
+type ShareState = 'idle' | 'copied' | 'error';
+
+// Web Share where the device offers it (mobile), clipboard elsewhere. A cancelled share is not an error.
+const shareOrCopy = async (title: string, text: string, url: string): Promise<'shared' | 'copied'> => {
+  if (typeof navigator.share === 'function') {
+    try {
+      await navigator.share({ title, text, url });
+      return 'shared';
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return 'shared';
+      // Fall through to the clipboard when sharing is refused for any other reason.
+    }
+  }
+  await navigator.clipboard.writeText(`${text} ${url}`);
+  return 'copied';
+};
 
 const REASON_TEXT: Record<GameOverReason, string> = {
   bomb: 'Você cortou uma bomba.',
@@ -35,8 +58,12 @@ const GameOverScreen: React.FC<GameOverScreenProps> = ({
   isSubmitting,
   onSave,
   onRestart,
+  challengeDay,
+  dailyBest,
+  onOpenStats,
   leaderboard
 }) => {
+  const [shareState, setShareState] = useState<ShareState>('idle');
   const [name, setName] = useState(playerAlias);
   const [saveState, setSaveState] = useState<SaveState>({ status: 'idle' });
   const nameId = useId();
@@ -47,6 +74,16 @@ const GameOverScreen: React.FC<GameOverScreenProps> = ({
   }, [playerAlias]);
 
   const accuracy = computeAccuracy(stats.sliced, stats.missed);
+
+  const handleShare = async () => {
+    const text = buildShareText({ score: stats.score, accuracy, maxCombo: stats.maxCombo, day: challengeDay ?? undefined });
+    try {
+      const outcome = await shareOrCopy('Shadow Dojo', text, buildShareUrl(window.location.origin, challengeDay ?? undefined));
+      setShareState(outcome === 'copied' ? 'copied' : 'idle');
+    } catch {
+      setShareState('error');
+    }
+  };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -85,6 +122,12 @@ const GameOverScreen: React.FC<GameOverScreenProps> = ({
         <div className="flex flex-col gap-2">
           <h1 id="game-over-title" className="text-h1 text-fg">Fim de jogo</h1>
           <p className="text-lead text-fg-secondary">{REASON_TEXT[reason]} {senseiWisdom}</p>
+          {challengeDay && (
+            <p className="text-caption text-fg-secondary">
+              Desafio de {formatDayShort(challengeDay)}
+              {dailyBest !== null && <> · seu melhor neste desafio: <span className="ms-num font-semibold text-fg">{formatInteger(dailyBest)}</span></>}
+            </p>
+          )}
         </div>
 
         <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
@@ -128,7 +171,20 @@ const GameOverScreen: React.FC<GameOverScreenProps> = ({
         </form>
 
         <div>
-          <button type="button" className="ms-btn ms-btn--primary" onClick={onRestart}>Jogar de novo</button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" className="ms-btn ms-btn--primary" onClick={onRestart}>Jogar de novo</button>
+            <button type="button" className="ms-btn ms-btn--secondary" onClick={handleShare}>
+              <Share2 size={16} strokeWidth={1.75} aria-hidden="true" />
+              Compartilhar
+            </button>
+            <button type="button" className="ms-btn ms-btn--ghost" onClick={onOpenStats}>
+              <ChartLine size={16} strokeWidth={1.75} aria-hidden="true" />
+              Seu desempenho
+            </button>
+          </div>
+          <p className={`mt-2 text-caption ${shareState === 'error' ? 'text-danger' : 'text-fg-secondary'}`} role="status">
+            {shareState === 'copied' ? 'Resultado e link copiados.' : shareState === 'error' ? 'Não foi possível compartilhar. Copie o endereço da página.' : ''}
+          </p>
         </div>
       </section>
 
