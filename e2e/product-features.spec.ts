@@ -54,15 +54,22 @@ test('finished rounds feed the performance view, with a table alternative to the
   await expect(table).toContainText('Livre · Mouse');
 });
 
-test('sharing copies the result and a link when the device has no share sheet', async ({ page, context }) => {
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+test('sharing copies the result and a link when the device has no share sheet', async ({ page }) => {
+  // Clipboard and share APIs only exist in secure contexts, which some headless builds deny to the
+  // http test origin; provide both so only the app's own fallback logic is under test.
   await page.addInitScript(() => {
+    const store = window as unknown as { __copied: string | null };
+    store.__copied = null;
     Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: async (text: string) => { store.__copied = text; } },
+      configurable: true
+    });
   });
   await page.goto('/');
   await finishPointerRound(page);
   await page.getByRole('button', { name: 'Compartilhar' }).click();
   await expect(page.getByText('Resultado e link copiados.')).toBeVisible();
-  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  const copied = await page.evaluate(() => (window as unknown as { __copied: string | null }).__copied);
   expect(copied).toMatch(/^Fiz 0 pontos no Shadow Dojo \(0% de precisão, combo x1\)\. Consegue me vencer\? http:\/\/shadow-dojo\.test:4190\/$/);
 });
