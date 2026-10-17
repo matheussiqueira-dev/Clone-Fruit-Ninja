@@ -221,7 +221,7 @@ const deployHeaders = Object.fromEntries(
 );
 // ...
 preview: {
-  allowedHosts: ['shadow-dojo.test'],
+  allowedHosts: ['shadow-dojo.localhost'],
   headers: deployHeaders
 }
 ```

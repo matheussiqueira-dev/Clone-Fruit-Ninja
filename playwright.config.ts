@@ -1,8 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const PORT = 4190;
-// A non-localhost name makes the app behave like the static deploy (no ranking API, results in the browser).
-const HOST = 'shadow-dojo.test';
+// Not exactly "localhost", so the app behaves like the static deploy (no ranking API, results in the
+// browser). A *.localhost name is still a secure context in every Chromium build, headless shell
+// included, so getUserMedia and service workers exist without command-line flags.
+const HOST = 'shadow-dojo.localhost';
 const isCI = Boolean(process.env.CI);
 
 export default defineConfig({
@@ -16,11 +18,8 @@ export default defineConfig({
     baseURL: `http://${HOST}:${PORT}`,
     trace: 'retain-on-failure',
     launchOptions: {
-      args: [
-        `--host-resolver-rules=MAP ${HOST} 127.0.0.1`,
-        // getUserMedia only exists in secure contexts; treat the test origin like the HTTPS deploy.
-        `--unsafely-treat-insecure-origin-as-secure=http://${HOST}:${PORT}`
-      ]
+      // The preview server listens on 127.0.0.1 only; never let the name resolve to ::1.
+      args: [`--host-resolver-rules=MAP ${HOST} 127.0.0.1`]
     }
   },
   projects: [

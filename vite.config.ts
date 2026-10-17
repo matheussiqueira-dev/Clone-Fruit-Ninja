@@ -69,7 +69,7 @@ export default defineConfig({
   },
   preview: {
     // Host used by the Playwright suite (playwright.config.ts) to mimic the static deploy.
-    allowedHosts: ['shadow-dojo.test'],
+    allowedHosts: ['shadow-dojo.localhost'],
     headers: deployHeaders
   },
   plugins: [
