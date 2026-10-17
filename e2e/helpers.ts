@@ -28,3 +28,30 @@ export const readHudScore = async (page: Page) => {
   const text = await page.locator('dt:text-is("Pontuação") + dd').innerText();
   return Number(text.replace(/\D/g, ''));
 };
+
+// Synthetic camera: getUserMedia returns an animated canvas stream, so the real model runs on frames.
+export const installFakeCamera = async (page: Page) => {
+  await page.addInitScript(() => {
+    const getUserMedia = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 640;
+      canvas.height = 480;
+      const context = canvas.getContext('2d');
+      let frame = 0;
+      const draw = () => {
+        if (context) {
+          context.fillStyle = `hsl(${(frame += 3) % 360} 40% 40%)`;
+          context.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        requestAnimationFrame(draw);
+      };
+      draw();
+      return Promise.resolve(canvas.captureStream(30));
+    };
+    if (navigator.mediaDevices) {
+      navigator.mediaDevices.getUserMedia = getUserMedia;
+    } else {
+      Object.defineProperty(navigator, 'mediaDevices', { value: { getUserMedia }, configurable: true });
+    }
+  });
+};

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { installFakeCamera } from './helpers';
 
 // Same budget as the camera error tests: loading the hand model on a busy machine is slow.
 const CAMERA_SETUP_TIMEOUT = 60_000;
@@ -13,29 +14,7 @@ test('camera mode loads the hand model, opens the camera and plays a round', asy
     if (message.type() === 'error') errors.push(message.text());
   });
 
-  await page.addInitScript(() => {
-    const getUserMedia = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 640;
-      canvas.height = 480;
-      const context = canvas.getContext('2d');
-      let frame = 0;
-      const draw = () => {
-        if (context) {
-          context.fillStyle = `hsl(${(frame += 3) % 360} 40% 40%)`;
-          context.fillRect(0, 0, canvas.width, canvas.height);
-        }
-        requestAnimationFrame(draw);
-      };
-      draw();
-      return Promise.resolve(canvas.captureStream(30));
-    };
-    if (navigator.mediaDevices) {
-      navigator.mediaDevices.getUserMedia = getUserMedia;
-    } else {
-      Object.defineProperty(navigator, 'mediaDevices', { value: { getUserMedia }, configurable: true });
-    }
-  });
+  await installFakeCamera(page);
 
   await page.goto('/');
   await page.getByLabel(/^Câmera/).check();
