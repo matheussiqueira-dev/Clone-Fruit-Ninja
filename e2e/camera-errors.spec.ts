@@ -72,9 +72,10 @@ test('a page without camera access (e.g. plain http on a LAN) says so and keeps 
   );
 });
 
-test('a hand model that fails to load never asks for the camera', async ({ page }) => {
+test('a hand model that fails to load never asks for the camera', async ({ page, context }) => {
   await rejectCamera(page, 'NotAllowedError');
-  await page.route('**/vision/models/hand_landmarker.task', (route) => route.abort());
+  // Context-level, so the abort also covers the fetch the service worker makes on the page's behalf.
+  await context.route('**/vision/models/hand_landmarker.task', (route) => route.abort());
   await activateCamera(page);
 
   await expectAlert(page, 'Não foi possível carregar o modelo da mão. Verifique a conexão e tente de novo.');
