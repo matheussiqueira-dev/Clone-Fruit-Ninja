@@ -35,7 +35,7 @@ export const normalizeHistory = (raw: unknown): RunRecord[] => {
     return typeof r.id === 'string'
       && typeof r.at === 'string' && !Number.isNaN(Date.parse(r.at))
       && isFiniteNonNegative(r.score)
-      && isFiniteNonNegative(r.accuracy) && (r.accuracy as number) <= 100
+      && isFiniteNonNegative(r.accuracy) && r.accuracy <= 100
       && isFiniteNonNegative(r.maxCombo)
       && isFiniteNonNegative(r.sliced)
       && isFiniteNonNegative(r.missed)

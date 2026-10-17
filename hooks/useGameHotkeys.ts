@@ -4,10 +4,10 @@ import { GameState, InputMode } from '../types';
 interface HotkeysParams {
   gameState: GameState;
   inputMode: InputMode;
-  onStart: () => void;
-  onRestart: () => void;
-  onInputModeChange: (mode: InputMode) => void;
-  onRefreshLeaderboard: () => void;
+  onStart: () => void | Promise<void>;
+  onRestart: () => void | Promise<void>;
+  onInputModeChange: (mode: InputMode) => void | Promise<void>;
+  onRefreshLeaderboard: () => void | Promise<void>;
 }
 
 // Radios, checkboxes and buttons are not typing: shortcuts must keep working after picking a mode.
@@ -38,25 +38,25 @@ export const useGameHotkeys = ({
       if (event.key === 'Enter' && !isActivatableControl(event.target)) {
         if (gameState === GameState.MENU) {
           event.preventDefault();
-          onStart();
+          void onStart();
           return;
         }
 
         if (gameState === GameState.GAME_OVER) {
           event.preventDefault();
-          onRestart();
+          void onRestart();
           return;
         }
       }
 
       if (event.key.toLowerCase() === 'm' && gameState === GameState.MENU) {
         event.preventDefault();
-        onInputModeChange(inputMode === 'camera' ? 'pointer' : 'camera');
+        void onInputModeChange(inputMode === 'camera' ? 'pointer' : 'camera');
       }
 
       if (event.key.toLowerCase() === 'r' && (gameState === GameState.MENU || gameState === GameState.GAME_OVER)) {
         event.preventDefault();
-        onRefreshLeaderboard();
+        void onRefreshLeaderboard();
       }
     };
 

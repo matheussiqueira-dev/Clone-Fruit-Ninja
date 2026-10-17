@@ -29,7 +29,7 @@ const readEntries = async (filePath: string) => {
   const raw = await fs.readFile(filePath, 'utf-8');
 
   try {
-    const parsed = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
     return normalizeLeaderboardEntries(parsed);
   } catch {
     await fs.writeFile(filePath, '[]', 'utf-8');

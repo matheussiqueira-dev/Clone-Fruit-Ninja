@@ -1,15 +1,12 @@
-/// <reference types="vitest/config" />
 import path from 'path';
-import { defineConfig } from 'vite';
-import { configDefaults } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import packageJson from './package.json';
 
 // Footer meta line (A.9): version from the manifest, short commit only on Vercel builds.
 const commitSha = (process.env.VERCEL_GIT_COMMIT_SHA ?? '').slice(0, 7);
 
-export default defineConfig(() => {
-    return {
+export default defineConfig({
       define: {
         __APP_VERSION__: JSON.stringify(packageJson.version),
         __COMMIT_SHA__: JSON.stringify(commitSha)
@@ -37,7 +34,15 @@ export default defineConfig(() => {
       },
       test: {
         // server/dist holds compiled copies of the server code (npm run build:server).
-        exclude: [...configDefaults.exclude, 'server/dist/**', 'e2e/**']
+        exclude: [...configDefaults.exclude, 'server/dist/**', 'e2e/**'],
+        coverage: {
+          provider: 'v8',
+          // The pure domain: engine, rules, history, sharing, leaderboard and the ranking server.
+          include: ['lib/**/*.ts', 'services/leaderboardService.ts', 'server/src/domain/**/*.ts'],
+          exclude: ['**/*.test.ts'],
+          reporter: ['text-summary', 'html'],
+          // Floor just under today's numbers, so coverage can only go up.
+          thresholds: { statements: 80, branches: 75, functions: 75, lines: 80 }
+        }
       }
-    };
 });

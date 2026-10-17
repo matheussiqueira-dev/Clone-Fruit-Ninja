@@ -24,6 +24,8 @@ export const useHandTracking = ({
 
     let animationFrameId: number | null = null;
     let videoFrameId: number | null = null;
+    // The element that owns videoFrameId: the ref may point elsewhere by cleanup time.
+    let videoFrameOwner: HTMLVideoElement | null = null;
     let cancelled = false;
     let detectHands: NonNullable<ReturnType<typeof getLoadedVision>>['detectHands'] | null = null;
 
@@ -48,7 +50,8 @@ export const useHandTracking = ({
       }
 
       if ('requestVideoFrameCallback' in videoRef.current) {
-        videoFrameId = videoRef.current.requestVideoFrameCallback(() => processFrame());
+        videoFrameOwner = videoRef.current;
+        videoFrameId = videoFrameOwner.requestVideoFrameCallback(() => processFrame());
         return;
       }
 
@@ -75,8 +78,8 @@ export const useHandTracking = ({
       if (animationFrameId !== null) {
         cancelAnimationFrame(animationFrameId);
       }
-      if (videoFrameId !== null && videoRef.current?.cancelVideoFrameCallback) {
-        videoRef.current.cancelVideoFrameCallback(videoFrameId);
+      if (videoFrameId !== null && videoFrameOwner?.cancelVideoFrameCallback) {
+        videoFrameOwner.cancelVideoFrameCallback(videoFrameId);
       }
     };
   }, [enabled, mirror, inputMode, videoRef, handPositionRef]);

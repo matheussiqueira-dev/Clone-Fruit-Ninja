@@ -62,7 +62,12 @@ test('sharing copies the result and a link when the device has no share sheet', 
     store.__copied = null;
     Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
     Object.defineProperty(navigator, 'clipboard', {
-      value: { writeText: async (text: string) => { store.__copied = text; } },
+      value: {
+        writeText: (text: string) => {
+          store.__copied = text;
+          return Promise.resolve();
+        }
+      },
       configurable: true
     });
   });

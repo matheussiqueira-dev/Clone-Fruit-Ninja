@@ -39,3 +39,4 @@ test-results/
 playwright-report/
 # Vercel CLI link (project and org ids)
 .vercel
+coverage/

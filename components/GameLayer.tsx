@@ -87,7 +87,8 @@ const GameLayer: React.FC<GameLayerProps> = ({
     });
     lastFrameRef.current = null;
     onStatsUpdate({ ...engineRef.current.stats });
-    // Only a new round (or seed) recreates the engine; size and effects are pushed in below.
+    // Only a new round (or seed) recreates the engine; size and effects are pushed in by the effects around this one.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- width, height and effects must not restart the round
   }, [gameState, seed, maxLives, onStatsUpdate]);
 
   useEffect(() => {

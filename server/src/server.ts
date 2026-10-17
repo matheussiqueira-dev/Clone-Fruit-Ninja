@@ -1,5 +1,5 @@
 import cors from 'cors';
-import express, { NextFunction, Request, Response } from 'express';
+import express, { NextFunction, Request, RequestHandler, Response } from 'express';
 import helmet from 'helmet';
 import { isValidLeaderboardSubmission, normalizeSubmission } from '../../lib/leaderboard';
 import { createFileLeaderboardRepository } from './domain/leaderboardRepository';
@@ -16,6 +16,13 @@ const parseAllowedOrigins = () => {
     .map((item) => item.trim())
     .filter(Boolean);
 };
+
+// Express 4 does not await handlers: forward a rejected promise to the error handler at the bottom.
+const asyncRoute =
+  (handler: (req: Request, res: Response) => Promise<void>): RequestHandler =>
+  (req, res, next) => {
+    handler(req, res).catch(next);
+  };
 
 const allowedOrigins = parseAllowedOrigins();
 const app = express();
@@ -51,38 +58,37 @@ app.get(`${API_PREFIX}/health`, (_req, res) => {
   });
 });
 
-app.get(`${API_PREFIX}/leaderboard`, async (req, res, next) => {
-  try {
+app.get(
+  `${API_PREFIX}/leaderboard`,
+  asyncRoute(async (req, res) => {
     const limit = Number(req.query.limit ?? 10);
     const entries = await leaderboardRepository.list(limit);
     res.json({
       entries,
       total: entries.length
     });
-  } catch (error) {
-    next(error);
-  }
-});
+  })
+);
 
-app.post(`${API_PREFIX}/leaderboard`, async (req, res, next) => {
-  try {
+app.post(
+  `${API_PREFIX}/leaderboard`,
+  asyncRoute(async (req, res) => {
     if (!isValidLeaderboardSubmission(req.body)) {
-      return res.status(400).json({
+      res.status(400).json({
         error: 'Payload inválido. Envie player, score, accuracy, maxCombo e inputMode.'
       });
+      return;
     }
 
     const payload = normalizeSubmission(req.body);
     const entries = await leaderboardRepository.add(payload);
 
-    return res.status(201).json({
+    res.status(201).json({
       entries,
       total: entries.length
     });
-  } catch (error) {
-    return next(error);
-  }
-});
+  })
+);
 
 app.use((_req, res) => {
   res.status(404).json({

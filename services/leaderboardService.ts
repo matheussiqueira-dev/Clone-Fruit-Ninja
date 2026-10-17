@@ -40,7 +40,7 @@ const readLocalLeaderboard = () => {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEYS.localLeaderboard);
     if (!raw) return [];
-    const parsed = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
     return normalizeLeaderboardEntries(parsed);
   } catch (error) {
     console.warn('Failed to read local leaderboard:', error);

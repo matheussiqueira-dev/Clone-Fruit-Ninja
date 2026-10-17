@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useState } from 'react';
+import React, { useId, useState } from 'react';
 import { GameOverReason, GameStats, LeaderboardScope } from '../types';
 import { computeAccuracy, formatInteger, formatPercent } from '../lib/stats';
 import { MAX_PLAYER_LENGTH, MIN_PLAYER_LENGTH, sanitizePlayerName } from '../lib/leaderboard';
@@ -69,9 +69,12 @@ const GameOverScreen: React.FC<GameOverScreenProps> = ({
   const nameId = useId();
   const helpId = useId();
 
-  useEffect(() => {
+  // The saved alias can arrive after mount; fill an empty field with it, adjusting state during render.
+  const [seenAlias, setSeenAlias] = useState(playerAlias);
+  if (playerAlias !== seenAlias) {
+    setSeenAlias(playerAlias);
     setName((current) => current || playerAlias);
-  }, [playerAlias]);
+  }
 
   const accuracy = computeAccuracy(stats.sliced, stats.missed);
 
@@ -139,7 +142,7 @@ const GameOverScreen: React.FC<GameOverScreenProps> = ({
           ))}
         </dl>
 
-        <form className="flex flex-col gap-2" onSubmit={handleSubmit}>
+        <form className="flex flex-col gap-2" onSubmit={(event) => void handleSubmit(event)}>
           <label htmlFor={nameId} className="text-small font-semibold text-fg">Nome no ranking</label>
           <div className="flex flex-col gap-3 sm:flex-row">
             <input
@@ -173,7 +176,7 @@ const GameOverScreen: React.FC<GameOverScreenProps> = ({
         <div>
           <div className="flex flex-wrap items-center gap-3">
             <button type="button" className="ms-btn ms-btn--primary" onClick={onRestart}>Jogar de novo</button>
-            <button type="button" className="ms-btn ms-btn--secondary" onClick={handleShare}>
+            <button type="button" className="ms-btn ms-btn--secondary" onClick={() => void handleShare()}>
               <Share2 size={16} strokeWidth={1.75} aria-hidden="true" />
               Compartilhar
             </button>

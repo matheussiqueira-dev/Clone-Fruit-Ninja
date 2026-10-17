@@ -2,7 +2,7 @@ import { CameraFailure, CameraStatus } from '../types';
 
 const readErrorName = (error: unknown): string => {
   if (typeof error === 'object' && error !== null && 'name' in error) {
-    const { name } = error as { name: unknown };
+    const { name } = error;
     return typeof name === 'string' ? name : '';
   }
   return '';

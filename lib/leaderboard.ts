@@ -14,7 +14,7 @@ const createId = () => {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
-export const sanitizePlayerName = (value: string) => {
+export const sanitizePlayerName = (value: unknown) => {
   if (typeof value !== 'string') return '';
   return collapseSpaces(value).slice(0, MAX_PLAYER_LENGTH);
 };
@@ -22,7 +22,7 @@ export const sanitizePlayerName = (value: string) => {
 export const isValidLeaderboardSubmission = (payload: unknown): payload is LeaderboardSubmission => {
   if (!payload || typeof payload !== 'object') return false;
   const candidate = payload as Record<string, unknown>;
-  const player = sanitizePlayerName(String(candidate.player ?? ''));
+  const player = sanitizePlayerName(candidate.player);
   const score = Number(candidate.score);
   const accuracy = Number(candidate.accuracy);
   const maxCombo = Number(candidate.maxCombo);
@@ -79,7 +79,7 @@ export const normalizeLeaderboardEntries = (entries: unknown): LeaderboardEntry[
     normalized.push({
       id,
       createdAt,
-      ...normalizeSubmission(candidate as LeaderboardSubmission)
+      ...normalizeSubmission(candidate)
     });
   });
 

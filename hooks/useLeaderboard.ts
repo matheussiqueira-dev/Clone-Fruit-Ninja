@@ -49,9 +49,20 @@ export const useLeaderboard = (): UseLeaderboardResult => {
     }
   }, [scope]);
 
+  // First load: loading already starts true, so only the result is set, and a late answer after
+  // unmount (or a scope change) is dropped.
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    let active = true;
+    void fetchLeaderboard(LEADERBOARD_LIMIT).then((result) => {
+      if (!active) return;
+      setEntries(result.entries);
+      setRemoteUnavailable(scope === 'remote' && result.source === 'local');
+      setLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [scope]);
 
   return {
     entries,
