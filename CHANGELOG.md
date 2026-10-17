@@ -11,6 +11,9 @@ Todas as mudanças relevantes deste projeto. Formato [Keep a Changelog](https://
 - Frutas, bomba e coração desenhados com emojis; metades com face de corte.
 
 ### Adicionado
+- PWA instalável (`vite-plugin-pwa` 2.0.0, MIT): manifesto em pt-BR (`Shadow Dojo`, `standalone`, ícone do `favicon.svg`, sem PNGs por enquanto) e service worker. O menu e o modo mouse abrem offline depois de uma visita.
+- Modelo e runtime WASM do modo câmera em cache `CacheFirst` só quando a câmera é usada, num cache com a versão do MediaPipe no nome (`vision-assets-1.1.1`); caches de versões anteriores são apagados. A segunda visita não baixa de novo os 21 MB.
+- Testes de ponta a ponta offline: menu e partida no mouse sem rede (sem nenhum pedido a `/vision/`) e modo câmera offline depois de uma sessão online.
 - Coração 💖 que devolve uma vida, só quando falta alguma.
 - Bônus por três ou mais frutas num só golpe, textos flutuantes de pontos/combo/vida, marcador da ponta do dedo e aviso visual ao perder ou ganhar vida.
 - Tailwind CSS 4 com o plugin do Vite; sem PostCSS nem autoprefixer. O texto do corpo segue a altura de linha do design system (1,6).
