@@ -25,3 +25,18 @@ dist-ssr
 
 # Local tooling
 .cto-toolkit/
+
+# Environment files (only the example is versioned)
+.env
+.env.*
+!.env.example
+
+# Leaderboard data written by the optional local server
+server/data/leaderboard.runtime.json
+
+# Playwright output
+test-results/
+playwright-report/
+# Vercel CLI link (project and org ids)
+.vercel
+coverage/

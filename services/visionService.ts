@@ -1,12 +1,22 @@
-import { FilesetResolver, HandLandmarker } from "@mediapipe/tasks-vision";
+import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 import { VisionResult } from '../types';
 
-const BASE_URL = (import.meta.env.BASE_URL ?? "/").replace(/\/?$/, "/");
+const BASE_URL = (import.meta.env.BASE_URL ?? '/').replace(/\/?$/, '/');
 const VISION_BASE_PATH = `${BASE_URL}vision/wasm`;
 const HAND_MODEL_PATH = `${BASE_URL}vision/models/hand_landmarker.task`;
 
 let handLandmarker: HandLandmarker | undefined;
 let lastVideoTime = -1;
+
+// Lower thresholds than the defaults: a fast swipe blurs the hand, and dropping it mid-swipe is what
+// made slicing feel unresponsive. The fingertip filter (lib/handFilter) absorbs the extra noise.
+const HAND_OPTIONS = {
+  runningMode: 'VIDEO',
+  numHands: 1,
+  minHandDetectionConfidence: 0.5,
+  minHandPresenceConfidence: 0.45,
+  minTrackingConfidence: 0.4
+} as const;
 
 export const initializeVision = async (): Promise<void> => {
   if (handLandmarker) return;
@@ -17,28 +27,22 @@ export const initializeVision = async (): Promise<void> => {
       handLandmarker = await HandLandmarker.createFromOptions(vision, {
         baseOptions: {
           modelAssetPath: HAND_MODEL_PATH,
-          delegate: "GPU"
+          delegate: 'GPU'
         },
-        runningMode: "VIDEO",
-        numHands: 1,
-        minHandDetectionConfidence: 0.6,
-        minTrackingConfidence: 0.6
+        ...HAND_OPTIONS
       });
     } catch (gpuError) {
-      console.warn("GPU delegate failed, falling back to CPU.", gpuError);
+      console.warn('GPU delegate failed, falling back to CPU.', gpuError);
       handLandmarker = await HandLandmarker.createFromOptions(vision, {
         baseOptions: {
           modelAssetPath: HAND_MODEL_PATH,
-          delegate: "CPU"
+          delegate: 'CPU'
         },
-        runningMode: "VIDEO",
-        numHands: 1,
-        minHandDetectionConfidence: 0.6,
-        minTrackingConfidence: 0.6
+        ...HAND_OPTIONS
       });
     }
   } catch (error) {
-    console.error("Failed to initialize vision:", error);
+    console.error('Failed to initialize vision:', error);
     throw error;
   }
 };
@@ -65,14 +69,14 @@ export const detectHands = (
         return null;
       }
       const mirror = options.mirror ?? true;
-      const landmarks = rawLandmarks.map(l => ({
+      const landmarks = rawLandmarks.map((l) => ({
         x: mirror ? 1 - l.x : l.x,
         y: l.y
       }));
 
       // Get the index finger tip (landmark 8)
       const indexTip = landmarks[8];
-      
+
       return {
         x: indexTip.x,
         y: indexTip.y,

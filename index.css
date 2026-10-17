@@ -1,155 +1,651 @@
-@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import './styles/ms-tokens.css' layer(base);
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/*
+  Classes only come from the markup. Automatic detection would also read the Markdown docs (which
+  quote class names) and any local git worktree under .claude, shipping CSS nobody uses.
+*/
+@import 'tailwindcss' source(none);
+@source './index.html';
+@source './index.tsx';
+@source './App.tsx';
+@source './components';
 
-:root {
-  --ms-bg: #05070d;
-  --ms-surface: #0b1020;
-  --ms-surface-soft: #111827;
-  --ms-border: rgba(34, 211, 238, 0.22);
-  --ms-primary: #22d3ee;
-  --ms-primary-soft: rgba(34, 211, 238, 0.12);
-  --ms-text: #f8fafc;
-  --ms-muted: #94a3b8;
-  --ms-success: #34d399;
-  --ms-warning: #fbbf24;
-  --ms-danger: #fb7185;
-  --bg-deep: var(--ms-bg);
-  --bg-soft: var(--ms-surface);
-  --glass: rgba(8, 14, 28, 0.72);
-  --text-main: var(--ms-text);
-  --text-muted: var(--ms-muted);
-  --accent-gold: #fbbf24;
-  --accent-cyan: var(--ms-primary);
-  color-scheme: dark;
+/*
+  Tailwind 4 theme mapped to the shared ms-tokens.css v1.0 (padrao-projetos, Appendix A.3).
+  Colours, fonts, weights, radii and shadows REPLACE the defaults (`--*-*: initial`), so only system
+  values exist: a default palette class (slate, amber, cyan...) generates nothing. After editing,
+  grep the components for default palette names.
+*/
+@theme {
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-inherit: inherit;
+
+  --color-canvas: var(--ms-bg);
+  --color-canvas-subtle: var(--ms-bg-subtle);
+
+  --color-surface: var(--ms-surface);
+  --color-surface-raised: var(--ms-surface-raised);
+
+  --color-fg: var(--ms-text);
+  --color-fg-secondary: var(--ms-text-secondary);
+  --color-fg-tertiary: var(--ms-text-tertiary);
+  --color-fg-disabled: var(--ms-text-disabled);
+  --color-fg-on-accent: var(--ms-text-on-accent);
+  --color-fg-on-solid: var(--ms-text-on-solid);
+
+  --color-line: var(--ms-border);
+  --color-line-strong: var(--ms-border-strong);
+  --color-line-control: var(--ms-border-control);
+  --color-line-control-hover: var(--ms-border-control-hover);
+
+  --color-accent: var(--ms-accent);
+  --color-accent-hover: var(--ms-accent-hover);
+  --color-accent-pressed: var(--ms-accent-pressed);
+  --color-accent-subtle: var(--ms-accent-subtle);
+
+  --color-positive: var(--ms-positive);
+  --color-positive-subtle: var(--ms-positive-subtle);
+
+  --color-warning: var(--ms-warning);
+  --color-warning-subtle: var(--ms-warning-subtle);
+
+  --color-danger: var(--ms-danger);
+  --color-danger-hover: var(--ms-danger-hover);
+  --color-danger-subtle: var(--ms-danger-subtle);
+
+  --color-info: var(--ms-info);
+  --color-info-subtle: var(--ms-info-subtle);
+
+  --font-*: initial;
+  --font-sans: var(--ms-font-sans);
+  --font-mono: var(--ms-font-mono);
+
+  --font-weight-*: initial;
+  --font-weight-normal: var(--ms-weight-regular);
+  --font-weight-medium: var(--ms-weight-medium);
+  --font-weight-semibold: var(--ms-weight-semibold);
+  --font-weight-bold: var(--ms-weight-bold);
+
+  --radius-*: initial;
+  --radius-none: 0;
+  --radius-xs: var(--ms-radius-xs);
+  --radius: var(--ms-radius-control);
+  --radius-control: var(--ms-radius-control);
+  --radius-card: var(--ms-radius-card);
+  --radius-feature: var(--ms-radius-feature);
+  --radius-full: var(--ms-radius-pill);
+
+  --shadow-*: initial;
+  --shadow-none: none;
+  --shadow-sm: var(--ms-shadow-sm);
+  --shadow-md: var(--ms-shadow-md);
+  --shadow-lg: var(--ms-shadow-lg);
+
+  --default-ring-color: var(--ms-focus-color);
+
+  --ring-offset-color: var(--ms-bg);
+
+  --text-micro: var(--ms-text-micro);
+  --text-micro--line-height: var(--ms-text-micro--line-height);
+  --text-fine: var(--ms-text-fine);
+  --text-fine--line-height: var(--ms-text-fine--line-height);
+  --text-caption: var(--ms-text-caption);
+  --text-caption--line-height: var(--ms-text-caption--line-height);
+  --text-small: var(--ms-text-small);
+  --text-small--line-height: var(--ms-text-small--line-height);
+  --text-body: var(--ms-text-body);
+  --text-body--line-height: var(--ms-text-body--line-height);
+  --text-lead: var(--ms-text-lead);
+  --text-lead--line-height: var(--ms-text-lead--line-height);
+  --text-h4: var(--ms-text-h4);
+  --text-h4--line-height: var(--ms-text-h4--line-height);
+  --text-h4--letter-spacing: var(--ms-tracking-tight);
+  --text-h4--font-weight: 600;
+  --text-h3: var(--ms-text-h3);
+  --text-h3--line-height: var(--ms-text-h3--line-height);
+  --text-h3--letter-spacing: var(--ms-tracking-tight);
+  --text-h3--font-weight: 600;
+  --text-h2: var(--ms-text-h2);
+  --text-h2--line-height: var(--ms-text-h2--line-height);
+  --text-h2--letter-spacing: var(--ms-tracking-heading);
+  --text-h2--font-weight: 600;
+  --text-h1: var(--ms-text-h1);
+  --text-h1--line-height: var(--ms-text-h1--line-height);
+  --text-h1--letter-spacing: var(--ms-tracking-heading);
+  --text-h1--font-weight: 700;
+  --text-kpi: var(--ms-text-kpi);
+  --text-kpi--line-height: var(--ms-text-kpi--line-height);
+  --text-kpi--letter-spacing: var(--ms-tracking-tight);
+  --text-kpi--font-weight: 600;
+  --text-display: var(--ms-text-display);
+  --text-display--line-height: var(--ms-text-display--line-height);
+  --text-display--letter-spacing: var(--ms-tracking-display);
+  --text-display--font-weight: 700;
+
+  --tracking-display: var(--ms-tracking-display);
+  --tracking-heading: var(--ms-tracking-heading);
+  --tracking-tight: var(--ms-tracking-tight);
+
+  --container-layout: var(--ms-layout-max);
+  --container-layout-wide: var(--ms-layout-max-wide);
+  --container-measure: var(--ms-measure);
+
+  --height-header: var(--ms-header-height);
+  --height-control: var(--ms-control-height);
+  --height-control-dense: var(--ms-control-height-dense);
+
+  --min-height-control: var(--ms-control-height);
+  --min-height-control-dense: var(--ms-control-height-dense);
+
+  --padding-gutter: var(--ms-layout-padding);
+
+  --ease-creative: var(--ms-ease-creative);
+  --ease-exit: var(--ms-ease-exit);
+
+  --transition-duration-micro: var(--ms-duration-micro);
+  --transition-duration-exit: var(--ms-duration-exit);
+  --transition-duration-reveal: var(--ms-duration-reveal);
+
+  --z-index-sticky: var(--ms-z-sticky);
+  --z-index-header: var(--ms-z-header);
+  --z-index-dropdown: var(--ms-z-dropdown);
+  --z-index-modal: var(--ms-z-modal);
+
+  --outline-offset-focus: var(--ms-focus-offset);
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
 
-html,
-body,
-#root {
-  height: 100%;
-}
-
-body {
-  margin: 0;
-  overflow: hidden;
-  font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
-  background: var(--bg-deep);
-  color: var(--text-main);
-}
-
-.hero-title {
-  font-family: 'Archivo Black', 'Impact', sans-serif;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.font-display {
-  font-family: 'Archivo Black', 'Impact', sans-serif;
-}
-
-.app-shell {
-  background: var(--bg-deep);
-  isolation: isolate;
-}
-
-.app-gradient {
-  background:
-    radial-gradient(1200px 760px at -5% -8%, rgba(34, 211, 238, 0.16), transparent 62%),
-    radial-gradient(900px 760px at 110% 15%, rgba(96, 165, 250, 0.16), transparent 58%),
-    radial-gradient(700px 560px at 80% 100%, rgba(251, 191, 36, 0.08), transparent 60%),
-    linear-gradient(170deg, #02040b 0%, #080f1f 52%, #050910 100%);
-}
-
-.app-glow {
-  background:
-    radial-gradient(520px 260px at 18% 22%, rgba(34, 211, 238, 0.22), transparent 62%),
-    radial-gradient(560px 300px at 78% 68%, rgba(96, 165, 250, 0.18), transparent 63%);
-  mix-blend-mode: screen;
-  opacity: 0.68;
-}
-
-.app-grid {
-  background-image:
-    linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
-  background-size: 64px 64px;
-  mask-image: radial-gradient(circle at 50% 50%, black 45%, transparent 100%);
-  opacity: 0.22;
-}
-
-.app-noise {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 0.8px, transparent 0.8px);
-  background-size: 2px 2px;
-  mix-blend-mode: soft-light;
-  opacity: 0.14;
-}
-
-.glass-card {
-  background: var(--glass);
-  backdrop-filter: blur(20px);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 16px 38px rgba(2, 8, 20, 0.45),
-    0 0 0 1px rgba(34, 211, 238, 0.05);
-  animation: reveal-up 420ms ease-out both;
-}
-
-.ms-panel-edge {
-  border-color: var(--ms-border);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 14px 34px rgba(2, 8, 20, 0.44),
-    0 0 28px rgba(34, 211, 238, 0.07);
-}
-
-@keyframes reveal-up {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.99);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-a,
-button,
-input {
-  -webkit-tap-highlight-color: transparent;
-}
-
-button:focus-visible,
-input:focus-visible,
-a:focus-visible {
-  outline: none;
-}
-
-@media (max-width: 768px) {
-  .glass-card {
-    backdrop-filter: blur(14px);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      0 10px 20px rgba(2, 8, 20, 0.36);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
   *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--ms-border);
+  }
+}
+
+@utility ms-container {
+  width: 100%;
+  max-width: var(--ms-layout-max);
+  margin-inline: auto;
+  padding-inline: var(--ms-layout-padding);
+}
+
+@utility ms-header {
+  /* ---------- Header (A.9) ---------- */
+  position: sticky;
+  top: 0;
+  z-index: var(--ms-z-header);
+  height: var(--ms-header-height);
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--ms-border);
+  background: color-mix(in srgb, var(--ms-bg) 92%, transparent);
+  backdrop-filter: blur(12px);
+
+  @supports not (backdrop-filter: blur(1px)) {
+    background: var(--ms-bg-subtle);
+  }
+}
+
+@utility ms-header__inner {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ms-space-4);
+}
+
+@utility ms-header__brand {
+  display: inline-flex;
+  min-height: var(--ms-control-height);
+  align-items: center;
+  gap: var(--ms-space-3);
+  color: var(--ms-text);
+  font-size: var(--ms-text-small);
+  font-weight: var(--ms-weight-semibold);
+  text-decoration: none;
+}
+
+@utility ms-header__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--ms-space-2);
+}
+
+@utility ms-nav-link {
+  display: inline-flex;
+  min-height: var(--ms-control-height);
+  min-width: var(--ms-control-height);
+  align-items: center;
+  justify-content: center;
+  gap: var(--ms-space-2);
+  padding-inline: var(--ms-space-2);
+  border-radius: var(--ms-radius-control);
+  color: var(--ms-text-secondary);
+  font-size: var(--ms-text-small);
+  font-weight: var(--ms-weight-medium);
+  text-decoration: none;
+  transition: color var(--ms-duration-micro) var(--ms-ease-creative);
+
+  &:hover {
+    color: var(--ms-text);
+    text-decoration-line: underline;
+    text-decoration-color: var(--ms-accent);
+    text-underline-offset: 0.2em;
+  }
+
+  &:focus-visible {
+    color: var(--ms-text);
+    text-decoration-line: underline;
+    text-decoration-color: var(--ms-accent);
+    text-underline-offset: 0.2em;
+  }
+}
+
+@utility ms-nav-link__label {
+  @media (max-width: 479px) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
+@utility ms-footer {
+  /* ---------- Footer (A.9) ---------- */
+  flex-shrink: 0;
+  border-top: 1px solid var(--ms-border);
+  background: color-mix(in srgb, var(--ms-surface) 45%, transparent);
+  padding-block: clamp(var(--ms-space-10), 5vw, var(--ms-space-12));
+}
+
+@utility ms-footer__inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ms-space-3);
+}
+
+@utility ms-footer__signature {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ms-space-2);
+  margin: 0;
+  font-size: var(--ms-text-caption);
+  line-height: var(--ms-text-caption--line-height);
+
+  & a {
+    color: var(--ms-text-secondary);
+    text-decoration: none;
+  }
+
+  & a:first-child {
+    color: var(--ms-text);
+    font-weight: var(--ms-weight-semibold);
+  }
+
+  & span {
+    color: var(--ms-text-tertiary);
+  }
+
+  & a:hover {
+    color: var(--ms-text);
+    text-decoration-line: underline;
+    text-decoration-color: var(--ms-accent);
+    text-underline-offset: 0.2em;
+  }
+
+  & a:focus-visible {
+    color: var(--ms-text);
+    text-decoration-line: underline;
+    text-decoration-color: var(--ms-accent);
+    text-underline-offset: 0.2em;
+  }
+}
+
+@utility ms-footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--ms-space-6);
+
+  & a {
+    display: inline-flex;
+    min-height: var(--ms-control-height);
+    align-items: center;
+    color: var(--ms-text-secondary);
+    font-size: var(--ms-text-small);
+    font-weight: var(--ms-weight-medium);
+    text-decoration: none;
+  }
+
+  & a:hover {
+    color: var(--ms-text);
+    text-decoration-line: underline;
+    text-decoration-color: var(--ms-accent);
+    text-underline-offset: 0.2em;
+  }
+
+  & a:focus-visible {
+    color: var(--ms-text);
+    text-decoration-line: underline;
+    text-decoration-color: var(--ms-accent);
+    text-underline-offset: 0.2em;
+  }
+}
+
+@utility ms-footer__meta {
+  margin: 0;
+  color: var(--ms-text-tertiary);
+  font-size: var(--ms-text-fine);
+  line-height: var(--ms-text-fine--line-height);
+}
+
+@utility ms-btn {
+  /* ---------- Buttons (A.7 §1) ---------- */
+  display: inline-flex;
+  min-height: var(--ms-control-height);
+  align-items: center;
+  justify-content: center;
+  gap: var(--ms-space-2);
+  padding: 0 var(--ms-space-5);
+  border: 1px solid transparent;
+  border-radius: var(--ms-radius-control);
+  font-size: var(--ms-text-small);
+  font-weight: var(--ms-weight-semibold);
+  line-height: 1.3;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color var(--ms-duration-micro) var(--ms-ease-creative),
+    border-color var(--ms-duration-micro) var(--ms-ease-creative),
+    color var(--ms-duration-micro) var(--ms-ease-creative);
+
+  &:disabled {
+    border-color: var(--ms-border);
+    background-color: var(--ms-surface);
+    color: var(--ms-text-disabled);
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  &[aria-disabled='true'] {
+    border-color: var(--ms-border);
+    background-color: var(--ms-surface);
+    color: var(--ms-text-disabled);
+    cursor: not-allowed;
+    transform: none;
+  }
+}
+
+@utility ms-btn--primary {
+  background-color: var(--ms-accent);
+  color: var(--ms-text-on-accent);
+
+  &:hover {
+    background-color: var(--ms-accent-hover);
+  }
+
+  &:active {
+    background-color: var(--ms-accent-pressed);
+    transform: translateY(1px);
+  }
+}
+
+@utility ms-btn--secondary {
+  border-color: var(--ms-border-control);
+  background-color: var(--ms-surface-raised);
+  color: var(--ms-text);
+
+  &:hover {
+    border-color: var(--ms-accent);
+  }
+
+  &:active {
+    background-color: var(--ms-bg);
+  }
+}
+
+@utility ms-btn--ghost {
+  background-color: transparent;
+  color: var(--ms-text-secondary);
+
+  &:hover {
+    background-color: var(--ms-surface-raised);
+    color: var(--ms-text);
+  }
+}
+
+@utility ms-btn--icon {
+  width: var(--ms-control-height);
+  padding: 0;
+}
+
+@utility ms-card {
+  /* ---------- Cards (A.7 §5) ---------- */
+  border: 1px solid var(--ms-border);
+  border-radius: var(--ms-radius-card);
+  background-color: var(--ms-surface);
+  padding: var(--ms-space-5);
+
+  @media (min-width: 1024px) {
+    padding: var(--ms-space-6);
+  }
+}
+
+@utility ms-alert {
+  /* ---------- Inline alerts (A.7 §8) ---------- */
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--ms-space-3);
+  padding: var(--ms-space-3) var(--ms-space-4);
+  border: 1px solid var(--ms-border);
+  border-inline-start: 3px solid var(--ms-danger);
+  border-radius: var(--ms-radius-control);
+  background-color: var(--ms-surface);
+}
+
+@utility ms-alert__icon {
+  margin-top: 2px;
+  color: var(--ms-danger);
+
+  .ms-alert--info & {
+    color: var(--ms-info);
+  }
+}
+
+@utility ms-alert--info {
+  border-inline-start-color: var(--ms-info);
+
+  & .ms-alert__icon {
+    color: var(--ms-info);
+  }
+}
+
+@utility ms-choice {
+  /* ---------- Choice rows: radio group (A.7 §3, §4) ---------- */
+  display: flex;
+  min-height: var(--ms-control-height);
+  align-items: flex-start;
+  gap: var(--ms-space-3);
+  padding: var(--ms-space-3) var(--ms-space-4);
+  border: 1px solid var(--ms-border-control);
+  border-radius: var(--ms-radius-control);
+  background-color: var(--ms-bg);
+  cursor: pointer;
+  transition: border-color var(--ms-duration-micro) var(--ms-ease-creative);
+
+  &:hover {
+    border-color: var(--ms-border-control-hover);
+  }
+
+  &:has(input:checked) {
+    border-color: var(--ms-accent);
+    background-color: var(--ms-accent-subtle);
+    box-shadow: inset 2px 0 0 var(--ms-accent);
+  }
+
+  & input {
+    width: 18px;
+    height: 18px;
+    margin-top: 3px;
+    flex-shrink: 0;
+    accent-color: var(--ms-accent);
+  }
+}
+
+@utility ms-switch {
+  /* ---------- Switch (A.7 §3) ---------- */
+  display: flex;
+  width: 100%;
+  min-height: var(--ms-control-height);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ms-space-4);
+  padding: var(--ms-space-2) 0;
+  border: 0;
+  background: none;
+  color: var(--ms-text);
+  text-align: start;
+  cursor: pointer;
+
+  &[aria-disabled='true'] {
+    cursor: not-allowed;
+  }
+
+  &[aria-checked='true'] .ms-switch__track {
+    background-color: var(--ms-accent);
+    box-shadow: none;
+  }
+
+  &[aria-checked='true'] .ms-switch__thumb {
+    background-color: var(--ms-text-on-accent);
+    transform: translateX(16px);
+  }
+}
+
+@utility ms-switch__track {
+  position: relative;
+  display: inline-flex;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+  align-items: center;
+  border-radius: var(--ms-radius-pill);
+  background-color: var(--ms-bg);
+  box-shadow: inset 0 0 0 1px var(--ms-border-control);
+  transition: background-color var(--ms-duration-micro) var(--ms-ease-creative);
+
+  .ms-switch[aria-checked='true'] & {
+    background-color: var(--ms-accent);
+    box-shadow: none;
+  }
+}
+
+@utility ms-switch__thumb {
+  width: 16px;
+  height: 16px;
+  margin-inline-start: 2px;
+  border-radius: var(--ms-radius-pill);
+  background-color: var(--ms-text-secondary);
+  transition: transform var(--ms-duration-micro) var(--ms-ease-creative);
+
+  .ms-switch[aria-checked='true'] & {
+    background-color: var(--ms-text-on-accent);
+    transform: translateX(16px);
+  }
+}
+
+@utility ms-input {
+  /* ---------- Text field (A.7 §3) ---------- */
+  width: 100%;
+  min-height: var(--ms-control-height);
+  padding: 0 var(--ms-space-3);
+  border: 1px solid var(--ms-border-control);
+  border-radius: var(--ms-radius-control);
+  background-color: var(--ms-bg);
+  color: var(--ms-text);
+  font-size: var(--ms-text-body);
+
+  &:hover {
+    border-color: var(--ms-border-control-hover);
+  }
+}
+
+@utility ms-dialog {
+  /* ---------- Dialog (A.7 §12) ---------- */
+  /* Tailwind 4's preflight zeroes every margin, including the UA's centring of a modal dialog. */
+  margin: auto;
+  width: calc(100% - 2 * var(--ms-layout-padding));
+  max-width: 32rem;
+  padding: var(--ms-space-6);
+  border: 1px solid var(--ms-border-strong);
+  border-radius: var(--ms-radius-card);
+  background-color: var(--ms-surface);
+  box-shadow: var(--ms-shadow-lg);
+  color: var(--ms-text);
+
+  &::backdrop {
+    background: var(--ms-scrim);
+  }
+
+  @media (max-width: 639px) {
+    width: 100%;
+    max-width: none;
+    max-height: 90dvh;
+    margin: auto 0 0;
+    border-radius: var(--ms-radius-card) var(--ms-radius-card) 0 0;
+  }
+}
+
+@utility ms-spinner {
+  /* ---------- Spinner (A.7 §1, loading) ---------- */
+  animation: ms-spin 0.9s linear infinite;
+}
+
+/* Local rules only use var(--ms-*): literal colours live in styles/ms-tokens.css and config/artPalette.ts. */
+
+@layer base {
+  ::placeholder {
+    color: var(--ms-text-tertiary);
+    opacity: 1;
+  }
+
+  body {
+    overscroll-behavior: none;
+  }
+
+  kbd {
+    display: inline-block;
+    padding: 0 var(--ms-space-1);
+    border: 1px solid var(--ms-border-strong);
+    border-radius: var(--ms-radius-xs);
+    background-color: var(--ms-surface-raised);
+    color: var(--ms-text);
+    font-family: var(--ms-font-mono);
+    font-size: var(--ms-text-micro);
+    line-height: var(--ms-text-micro--line-height);
+  }
+}
+
+@layer components {
+  @keyframes ms-spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 }

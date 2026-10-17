@@ -8,7 +8,8 @@ export const useReducedMotion = () => {
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     const update = () => setReduced(mediaQuery.matches);
     update();
-    if ('addEventListener' in mediaQuery) {
+    // Safari < 14 only implements the deprecated addListener/removeListener pair.
+    if (typeof mediaQuery.addEventListener === 'function') {
       mediaQuery.addEventListener('change', update);
       return () => mediaQuery.removeEventListener('change', update);
     }

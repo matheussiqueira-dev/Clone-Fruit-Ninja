@@ -1,8 +1,0 @@
-{
-  "name": "Fruit Ninja",
-  "description": "Jogo de corte com rastreamento de mão usando a câmera.",
-  "author": "Matheus Siqueira",
-  "requestFramePermissions": [
-    "camera"
-  ]
-}

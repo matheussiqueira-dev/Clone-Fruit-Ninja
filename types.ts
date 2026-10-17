@@ -1,3 +1,5 @@
+import type { ArtKind } from './config/artPalette';
+
 export interface Point {
   x: number;
   y: number;
@@ -12,7 +14,20 @@ export enum GameState {
 
 export type InputMode = 'camera' | 'pointer';
 
-export type CameraStatus = 'idle' | 'loading' | 'ready' | 'error';
+export type CameraStatus = 'idle' | 'loading-model' | 'requesting' | 'ready' | 'error';
+
+export type CameraFailure =
+  'denied' | 'unavailable' | 'busy' | 'model-error' | 'unsupported' | 'timeout' | 'error';
+
+export type GameOverReason = 'bomb' | 'lives';
+
+export type LeaderboardScope = 'local' | 'remote';
+
+export interface LeaderboardResult {
+  entries: LeaderboardEntry[];
+  // Where the entries came from. A remote scope can still answer 'local' when the API fails.
+  source: LeaderboardScope;
+}
 
 export interface GameSettings {
   mirrorVideo: boolean;
@@ -38,10 +53,13 @@ export interface Fruit {
   vx: number;
   vy: number;
   radius: number;
-  color: string;
-  type: 'fruit' | 'bomb';
+  kind: ArtKind;
+  // 'life' is the heart that gives back one life when sliced.
+  type: 'fruit' | 'bomb' | 'life';
   rotation: number;
   rotationSpeed: number;
+  // Physics time multiplier: grows with the score to speed up the arc.
+  timeScale: number;
   sliced: boolean;
 }
 

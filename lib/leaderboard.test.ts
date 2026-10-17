@@ -14,6 +14,13 @@ describe('leaderboard utils', () => {
     expect(sanitizePlayerName('x'.repeat(100)).length).toBe(24);
   });
 
+  it('rejects a player that is not a string instead of stringifying it', () => {
+    const base = { score: 120, accuracy: 85, maxCombo: 4, inputMode: 'camera' };
+    expect(isValidLeaderboardSubmission({ ...base, player: { name: 'Ninja' } })).toBe(false);
+    expect(isValidLeaderboardSubmission({ ...base, player: ['Ninja'] })).toBe(false);
+    expect(sanitizePlayerName(42)).toBe('');
+  });
+
   it('validates leaderboard payload with strict bounds', () => {
     expect(
       isValidLeaderboardSubmission({

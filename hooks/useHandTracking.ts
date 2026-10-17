@@ -1,6 +1,7 @@
 import { useEffect, type MutableRefObject } from 'react';
 import { InputMode, VisionResult } from '../types';
-import { detectHands } from '../services/visionService';
+import { getLoadedVision, loadVision } from '../services/visionLoader';
+import { HAND_LOST_GRACE_MS, createPointFilter, mapCoverPoint } from '../lib/handFilter';
 
 interface HandTrackingParams {
   enabled: boolean;
@@ -24,16 +25,31 @@ export const useHandTracking = ({
 
     let animationFrameId: number | null = null;
     let videoFrameId: number | null = null;
+    // The element that owns videoFrameId: the ref may point elsewhere by cleanup time.
+    let videoFrameOwner: HTMLVideoElement | null = null;
     let cancelled = false;
+    let detectHands: NonNullable<ReturnType<typeof getLoadedVision>>['detectHands'] | null = null;
+    const tipFilter = createPointFilter();
+    let lastSeenAt = -Infinity;
 
     const processFrame = () => {
-      if (cancelled) return;
+      if (cancelled || !detectHands) return;
 
       const video = videoRef.current;
       if (video) {
         const result = detectHands(video, { mirror });
-        if (result !== undefined) {
-          handPositionRef.current = result ?? null;
+        const now = performance.now();
+        if (result) {
+          const frame = { width: video.videoWidth, height: video.videoHeight };
+          const stage = { width: video.clientWidth, height: video.clientHeight };
+          const landmarks = result.landmarks?.map((point) => mapCoverPoint(point, frame, stage));
+          const tip = tipFilter.filter(mapCoverPoint(result, frame, stage), now);
+          handPositionRef.current = { x: tip.x, y: tip.y, landmarks };
+          lastSeenAt = now;
+        } else if (result === null && now - lastSeenAt > HAND_LOST_GRACE_MS) {
+          // Gone for longer than a blurred frame or two: the next sighting starts a new stroke.
+          handPositionRef.current = null;
+          tipFilter.reset();
         }
       }
 
@@ -47,24 +63,37 @@ export const useHandTracking = ({
       }
 
       if ('requestVideoFrameCallback' in videoRef.current) {
-        videoFrameId = videoRef.current.requestVideoFrameCallback(() => processFrame());
+        videoFrameOwner = videoRef.current;
+        videoFrameId = videoFrameOwner.requestVideoFrameCallback(() => processFrame());
         return;
       }
 
       animationFrameId = requestAnimationFrame(processFrame);
     };
 
-    schedule();
+    // The camera controller loaded the module before the camera became ready; load it here only as a fallback.
+    const loaded = getLoadedVision();
+    if (loaded) {
+      detectHands = loaded.detectHands;
+      schedule();
+    } else {
+      loadVision()
+        .then((vision) => {
+          if (cancelled) return;
+          detectHands = vision.detectHands;
+          schedule();
+        })
+        .catch((error: unknown) => console.error('Hand tracking could not start:', error));
+    }
 
     return () => {
       cancelled = true;
       if (animationFrameId !== null) {
         cancelAnimationFrame(animationFrameId);
       }
-      if (videoFrameId !== null && videoRef.current?.cancelVideoFrameCallback) {
-        videoRef.current.cancelVideoFrameCallback(videoFrameId);
+      if (videoFrameId !== null && videoFrameOwner?.cancelVideoFrameCallback) {
+        videoFrameOwner.cancelVideoFrameCallback(videoFrameId);
       }
     };
   }, [enabled, mirror, inputMode, videoRef, handPositionRef]);
 };
-

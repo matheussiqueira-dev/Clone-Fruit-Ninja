@@ -1,9 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import {
-  LeaderboardEntry,
-  LeaderboardSubmission
-} from '../../../types';
+import { LeaderboardEntry, LeaderboardSubmission } from '../../../types';
 import { normalizeLeaderboardEntries, sortLeaderboard } from '../../../lib/leaderboard';
 
 interface LeaderboardRepository {
@@ -11,7 +8,7 @@ interface LeaderboardRepository {
   add: (submission: LeaderboardSubmission) => Promise<LeaderboardEntry[]>;
 }
 
-const DEFAULT_PATH = path.resolve(process.cwd(), 'server', 'data', 'leaderboard.json');
+const DEFAULT_PATH = path.resolve(process.cwd(), 'server', 'data', 'leaderboard.runtime.json');
 
 const ensureDataFile = async (filePath: string) => {
   const directory = path.dirname(filePath);
@@ -29,7 +26,7 @@ const readEntries = async (filePath: string) => {
   const raw = await fs.readFile(filePath, 'utf-8');
 
   try {
-    const parsed = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
     return normalizeLeaderboardEntries(parsed);
   } catch {
     await fs.writeFile(filePath, '[]', 'utf-8');
@@ -59,7 +56,10 @@ export const createFileLeaderboardRepository = (filePath = DEFAULT_PATH): Leader
 
   const runSafely = async <T>(task: () => Promise<T>) => {
     const result = writeQueue.then(task, task);
-    writeQueue = result.then(() => undefined, () => undefined);
+    writeQueue = result.then(
+      () => undefined,
+      () => undefined
+    );
     return result;
   };
 

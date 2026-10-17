@@ -13,9 +13,6 @@
     "allowImportingTsExtensions": false,
     "types": ["node"]
   },
-  "include": [
-    "src/**/*.ts",
-    "../lib/leaderboard.ts",
-    "../types.ts"
-  ]
+  "include": ["src/**/*.ts", "../lib/leaderboard.ts", "../types.ts"],
+  "exclude": ["src/**/*.test.ts"]
 }

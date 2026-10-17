@@ -1,23 +1,46 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
-import { CameraStatus } from '../types';
-import { disposeVision, initializeVision } from '../services/visionService';
+import { CameraFailure, CameraStatus } from '../types';
+import { getLoadedVision, loadVision } from '../services/visionLoader';
 import { VIDEO_CONSTRAINTS } from '../config/gameConfig';
+import { classifyCameraError, isCameraBusy } from '../lib/camera';
+
+const VIDEO_START_TIMEOUT_MS = 8000;
 
 interface CameraController {
   videoRef: MutableRefObject<HTMLVideoElement | null>;
   cameraStatus: CameraStatus;
-  cameraError: string | null;
+  cameraFailure: CameraFailure | null;
   prepareCamera: () => Promise<boolean>;
   stopCamera: () => void;
-  clearCameraError: () => void;
-  markCameraIdle: () => void;
+  resetCamera: () => void;
 }
+
+// Resolves once the video has a frame; rejects with a TimeoutError if the device never delivers one.
+const waitForVideoData = (video: HTMLVideoElement) =>
+  new Promise<void>((resolve, reject) => {
+    if (video.readyState >= 2) {
+      resolve();
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      video.removeEventListener('loadeddata', onLoaded);
+      reject(new DOMException('Video did not start in time.', 'TimeoutError'));
+    }, VIDEO_START_TIMEOUT_MS);
+
+    function onLoaded() {
+      window.clearTimeout(timeout);
+      resolve();
+    }
+
+    video.addEventListener('loadeddata', onLoaded, { once: true });
+  });
 
 export const useCameraController = (): CameraController => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>('idle');
-  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [cameraFailure, setCameraFailure] = useState<CameraFailure | null>(null);
 
   const stopCamera = useCallback(() => {
     if (cameraStreamRef.current) {
@@ -30,75 +53,79 @@ export const useCameraController = (): CameraController => {
     }
   }, []);
 
-  const clearCameraError = useCallback(() => {
-    setCameraError(null);
-  }, []);
-
-  const markCameraIdle = useCallback(() => {
+  const resetCamera = useCallback(() => {
+    stopCamera();
     setCameraStatus('idle');
-  }, []);
+    setCameraFailure(null);
+  }, [stopCamera]);
+
+  const fail = useCallback(
+    (failure: CameraFailure) => {
+      stopCamera();
+      setCameraFailure(failure);
+      setCameraStatus('error');
+    },
+    [stopCamera]
+  );
 
   const prepareCamera = useCallback(async () => {
-    if (cameraStatus === 'loading' || cameraStatus === 'ready') {
-      return cameraStatus === 'ready';
-    }
+    if (isCameraBusy(cameraStatus)) return false;
+    if (cameraStatus === 'ready') return true;
 
+    // Missing in insecure contexts (http on a LAN IP) and in browsers without camera support.
     if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraError('Câmera não suportada neste navegador.');
-      setCameraStatus('error');
+      fail('unsupported');
       return false;
     }
 
-    setCameraStatus('loading');
-    setCameraError(null);
+    setCameraFailure(null);
+    setCameraStatus('loading-model');
+
+    // The hand model loads before the permission prompt, so a model failure never asks for the camera.
+    try {
+      const vision = await loadVision();
+      await vision.initializeVision();
+    } catch (error) {
+      console.error('Hand model failed to load:', error);
+      fail('model-error');
+      return false;
+    }
+
+    setCameraStatus('requesting');
 
     try {
-      await initializeVision();
       const stream = await navigator.mediaDevices.getUserMedia(VIDEO_CONSTRAINTS);
       cameraStreamRef.current = stream;
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-
-        if (videoRef.current.readyState < 2) {
-          await new Promise<void>((resolve) => {
-            if (!videoRef.current) {
-              resolve();
-              return;
-            }
-            videoRef.current.addEventListener('loadeddata', () => resolve(), { once: true });
-          });
-        }
-
-        await videoRef.current.play().catch(() => undefined);
+      const video = videoRef.current;
+      if (video) {
+        video.srcObject = stream;
+        await waitForVideoData(video);
+        await video.play().catch(() => undefined);
       }
 
       setCameraStatus('ready');
       return true;
     } catch (error) {
       console.error('Camera setup failed:', error);
-      stopCamera();
-      setCameraError('Permita o acesso à câmera para jogar.');
-      setCameraStatus('error');
+      fail(classifyCameraError(error));
       return false;
     }
-  }, [cameraStatus, stopCamera]);
+  }, [cameraStatus, fail]);
 
   useEffect(() => {
     return () => {
       stopCamera();
-      disposeVision();
+      getLoadedVision()?.disposeVision();
     };
   }, [stopCamera]);
 
   return {
     videoRef,
     cameraStatus,
-    cameraError,
+    cameraFailure,
     prepareCamera,
     stopCamera,
-    clearCameraError,
-    markCameraIdle
+    resetCamera
   };
 };
-

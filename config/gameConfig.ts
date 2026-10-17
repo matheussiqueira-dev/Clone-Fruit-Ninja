@@ -14,7 +14,8 @@ export const STORAGE_KEYS = {
   settings: 'fruit-ninja:settings',
   inputMode: 'fruit-ninja:input-mode',
   localLeaderboard: 'fruit-ninja:local-leaderboard',
-  playerAlias: 'fruit-ninja:player-alias'
+  playerAlias: 'fruit-ninja:player-alias',
+  history: 'fruit-ninja:history'
 } as const;
 
 export const DEFAULT_SETTINGS: GameSettings = {
@@ -25,7 +26,8 @@ export const DEFAULT_SETTINGS: GameSettings = {
   lowVfx: false
 };
 
-export const MAX_LIVES = 3;
+// Five mistakes (a dropped fruit or a cut bomb) end the round.
+export const MAX_LIVES = 5;
 
 export const INITIAL_STATS: GameStats = {
   score: 0,

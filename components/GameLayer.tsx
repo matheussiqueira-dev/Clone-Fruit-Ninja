@@ -1,65 +1,44 @@
 import React, { useEffect, useRef } from 'react';
-import { VisionResult, GameState, Fruit, Particle, GameSettings, GameStats } from '../types';
-import {
-  TARGET_FPS,
-  applyMiss,
-  distanceToSegmentSq,
-  getBombChance,
-  getSpawnInterval,
-  getSpeedMultiplier,
-  shouldResetCombo,
-  updateComboOnSlice
-} from '../lib/gameLogic';
+import { GameOverReason, GameSettings, GameState, GameStats, InputMode, VisionResult } from '../types';
+import { readCanvasTokens } from '../config/artPalette';
+import { createGameEngine, GameEngine } from '../lib/engine/gameEngine';
+import { createSeededRng } from '../lib/engine/rng';
+import { renderScene } from './game/renderScene';
 
 interface GameLayerProps {
   handPositionRef: React.MutableRefObject<VisionResult | null>;
   gameState: GameState;
   settings: GameSettings;
+  // Freezes the round (settings open): no physics, no cutting.
+  paused: boolean;
+  // Reduced motion (A.7): no blade trail and no particles.
+  reducedMotion: boolean;
+  // Seed for a reproducible round (daily challenge); null plays a random round.
+  seed: number | null;
   maxLives: number;
+  // Camera play gets a wider blade reach: a tracked fingertip is less precise than a mouse.
+  inputMode: InputMode;
   onStatsUpdate: (stats: Partial<GameStats>) => void;
-  onGameOver: (finalScore: number) => void;
+  onGameOver: (finalStats: GameStats, reason: GameOverReason) => void;
   width: number;
   height: number;
 }
 
-const GRAVITY = 30; // px/s^2
-const PARTICLE_GRAVITY = 12; // px/s^2
-const PARTICLE_FADE = 1.2; // life per second
-const MAX_DELTA = 0.05;
+const TRAIL_LIMIT = 14;
+const TRAIL_LIMIT_LOW_VFX = 8;
+const HIT_ASSIST: Record<InputMode, number> = { camera: 1.8, pointer: 1 };
 
-const COLORS = {
-  APPLE: '#F97316',
-  ORANGE: '#FDBA74',
-  WATERMELON: '#34D399',
-  BOMB: '#0B1220',
-  TRAIL: '#F8FAFC',
-  PARTICLE_FRUIT: '#FDE68A',
-  PARTICLE_BOMB: '#64748B'
-};
-
-const FRUIT_COLORS = [COLORS.APPLE, COLORS.ORANGE, COLORS.WATERMELON];
-
-const HAND_CONNECTIONS: Array<[number, number]> = [
-  [0,1],[1,2],[2,3],[3,4],
-  [0,5],[5,6],[6,7],[7,8],
-  [5,9],[9,10],[10,11],[11,12],
-  [9,13],[13,14],[14,15],[15,16],
-  [13,17],[17,18],[18,19],[19,20],
-  [0,17]
-];
-
-const createId = () => {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID();
-  }
-  return Math.random().toString(36).slice(2);
-};
-
+// React shell around the pure engine (lib/engine): owns the canvas and the frame loop,
+// feeds the engine time and blade input, and hands its state to the renderer.
 const GameLayer: React.FC<GameLayerProps> = ({
   handPositionRef,
   gameState,
   settings,
+  paused,
+  reducedMotion,
+  seed,
   maxLives,
+  inputMode,
   onStatsUpdate,
   onGameOver,
   width,
@@ -67,24 +46,23 @@ const GameLayer: React.FC<GameLayerProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
-
-  const fruitsRef = useRef<Fruit[]>([]);
-  const particlesRef = useRef<Particle[]>([]);
-  const trailRef = useRef<{x: number; y: number}[]>([]);
-  const scoreRef = useRef(0);
-  const comboRef = useRef(0);
-  const maxComboRef = useRef(0);
-  const slicedRef = useRef(0);
-  const missedRef = useRef(0);
-  const livesRef = useRef(maxLives);
-  const spawnAccumulatorRef = useRef(0);
+  const engineRef = useRef<GameEngine | null>(null);
   const lastFrameRef = useRef<number | null>(null);
-  const lastSliceTimeRef = useRef<number>(-Infinity);
   const requestRef = useRef<number | null>(null);
+
+  const effectsEnabled = !settings.lowVfx && !reducedMotion;
+  const trailLimit = settings.lowVfx ? TRAIL_LIMIT_LOW_VFX : TRAIL_LIMIT;
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    if (width <= 0 || height <= 0) {
+      // Outside a round the stage can be a long scrolling page: release the backing store.
+      canvas.width = 0;
+      canvas.height = 0;
+      ctxRef.current = null;
+      return;
+    }
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -94,308 +72,106 @@ const GameLayer: React.FC<GameLayerProps> = ({
     canvas.style.height = `${height}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctxRef.current = ctx;
+    engineRef.current?.resize(width, height);
   }, [width, height]);
 
-  const resetGame = () => {
-    fruitsRef.current = [];
-    particlesRef.current = [];
-    trailRef.current = [];
-    scoreRef.current = 0;
-    comboRef.current = 0;
-    maxComboRef.current = 0;
-    slicedRef.current = 0;
-    missedRef.current = 0;
-    livesRef.current = maxLives;
-    spawnAccumulatorRef.current = 0;
-    lastFrameRef.current = null;
-    lastSliceTimeRef.current = -Infinity;
-    onStatsUpdate({
-      score: 0,
-      combo: 0,
-      maxCombo: 0,
-      sliced: 0,
-      missed: 0,
-      lives: maxLives
+  // A new engine per round: fresh state, and a seeded generator for the daily challenge.
+  useEffect(() => {
+    if (gameState !== GameState.PLAYING) {
+      engineRef.current = null;
+      return;
+    }
+    engineRef.current = createGameEngine({
+      width,
+      height,
+      maxLives,
+      rng: seed === null ? Math.random : createSeededRng(seed),
+      particles: effectsEnabled,
+      trailLimit,
+      hitAssist: HIT_ASSIST[inputMode]
     });
-  };
+    lastFrameRef.current = null;
+    onStatsUpdate({ ...engineRef.current.stats });
+    // Only a new round (or seed) recreates the engine; size and effects are pushed in by the effects around this one.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- width, height and effects must not restart the round
+  }, [gameState, seed, maxLives, onStatsUpdate]);
 
   useEffect(() => {
-    if (gameState === GameState.PLAYING) {
-      resetGame();
-    }
-  }, [gameState, maxLives, onStatsUpdate]);
+    engineRef.current?.setOptions({
+      particles: effectsEnabled,
+      trailLimit,
+      hitAssist: HIT_ASSIST[inputMode]
+    });
+  }, [effectsEnabled, trailLimit, inputMode]);
 
   useEffect(() => {
     const ctx = ctxRef.current;
+    const engine = engineRef.current;
     if (!ctx) return;
-    if (gameState !== GameState.PLAYING) {
+    if (gameState !== GameState.PLAYING || !engine) {
       ctx.clearRect(0, 0, width, height);
-      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      return;
+    }
+    if (paused) {
+      // Keep the last frame on screen; on resume the clock and the blade start fresh.
+      lastFrameRef.current = null;
+      engine.breakStroke();
       return;
     }
 
-    const spawnFruit = () => {
-      const score = scoreRef.current;
-      const speedMultiplier = getSpeedMultiplier(score);
-      const isBomb = Math.random() < getBombChance(score);
-      const radius = isBomb ? 38 : 30 + Math.random() * 18;
-      const x = Math.random() * (width - 100) + 50;
-
-      fruitsRef.current.push({
-        id: createId(),
-        x,
-        y: height + radius,
-        vx: (Math.random() - 0.5) * (width * 0.016) * TARGET_FPS * speedMultiplier,
-        vy: -(Math.random() * 8 + 14) * TARGET_FPS * speedMultiplier,
-        radius,
-        color: isBomb ? COLORS.BOMB : FRUIT_COLORS[Math.floor(Math.random() * FRUIT_COLORS.length)],
-        type: isBomb ? 'bomb' : 'fruit',
-        rotation: 0,
-        rotationSpeed: (Math.random() - 0.5) * 0.18 * TARGET_FPS,
-        sliced: false
-      });
-    };
-
-    const createExplosion = (x: number, y: number, color: string, count = 10) => {
-      if (settings.lowVfx) {
-        count = Math.max(4, Math.floor(count * 0.6));
-      }
-      for (let i = 0; i < count; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = (Math.random() * 5 + 2) * TARGET_FPS;
-        particlesRef.current.push({
-          id: createId(),
-          x,
-          y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          color,
-          life: 1.0,
-          size: Math.random() * 5 + 2
-        });
-      }
-    };
+    const tokens = readCanvasTokens();
 
     const loop = () => {
       const now = performance.now();
-      const lastFrame = lastFrameRef.current ?? now;
-      const delta = Math.min((now - lastFrame) / 1000, MAX_DELTA);
+      const delta = lastFrameRef.current === null ? 0 : (now - lastFrameRef.current) / 1000;
       lastFrameRef.current = now;
 
-      ctx.clearRect(0, 0, width, height);
+      const hand = handPositionRef.current;
+      const blade = hand ? { x: hand.x * width, y: hand.y * height } : null;
+      const result = engine.step(delta, now, blade);
 
-      const handPosition = handPositionRef.current;
+      renderScene(ctx, engine.state, {
+        width,
+        height,
+        tokens,
+        landmarks: hand?.landmarks,
+        showSkeleton: settings.showHandSkeleton,
+        showTrail: settings.showTrail && !reducedMotion,
+        trailWidth: settings.lowVfx ? 7 : 11,
+        cursor: blade,
+        // A mouse already has its own cursor; a tracked hand needs one drawn.
+        showCursor: inputMode === 'camera',
+        flashes: !reducedMotion,
+        now
+      });
 
-      if (settings.showHandSkeleton && handPosition?.landmarks) {
-        const lms = handPosition.landmarks;
-        ctx.save();
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        ctx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        HAND_CONNECTIONS.forEach(([start, end]) => {
-          const p1 = lms[start];
-          const p2 = lms[end];
-          ctx.moveTo(p1.x * width, p1.y * height);
-          ctx.lineTo(p2.x * width, p2.y * height);
-        });
-        ctx.stroke();
-
-        ctx.fillStyle = '#38BDF8';
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = '#38BDF8';
-        lms.forEach((lm) => {
-          ctx.beginPath();
-          ctx.arc(lm.x * width, lm.y * height, 3, 0, Math.PI * 2);
-          ctx.fill();
-        });
-        ctx.restore();
+      if (result.stats) onStatsUpdate(result.stats);
+      if (result.gameOver) {
+        onGameOver({ ...engine.stats }, result.gameOver);
+        return;
       }
-
-      if (handPosition) {
-        const screenX = handPosition.x * width;
-        const screenY = handPosition.y * height;
-        const lastPoint = trailRef.current[trailRef.current.length - 1];
-        const shouldAdd = !lastPoint
-          || Math.abs(lastPoint.x - screenX) > 1
-          || Math.abs(lastPoint.y - screenY) > 1;
-        if (shouldAdd) {
-          trailRef.current.push({ x: screenX, y: screenY });
-        }
-        const trailLimit = settings.lowVfx ? 8 : 14;
-        if (trailRef.current.length > trailLimit) {
-          trailRef.current.splice(0, trailRef.current.length - trailLimit);
-        }
-      } else if (trailRef.current.length > 0) {
-        trailRef.current.shift();
-      }
-
-      if (settings.showTrail && trailRef.current.length > 1) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(trailRef.current[0].x, trailRef.current[0].y);
-        for (let i = 1; i < trailRef.current.length; i++) {
-          const point = trailRef.current[i];
-          const prev = trailRef.current[i - 1];
-          const midX = (prev.x + point.x) / 2;
-          const midY = (prev.y + point.y) / 2;
-          ctx.quadraticCurveTo(prev.x, prev.y, midX, midY);
-        }
-        ctx.lineTo(
-          trailRef.current[trailRef.current.length - 1].x,
-          trailRef.current[trailRef.current.length - 1].y
-        );
-        ctx.strokeStyle = COLORS.TRAIL;
-        ctx.lineWidth = settings.lowVfx ? 6 : 8;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.shadowBlur = 14;
-        ctx.shadowColor = '#38BDF8';
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      if (comboRef.current > 0 && shouldResetCombo(now, lastSliceTimeRef.current)) {
-        comboRef.current = 0;
-        onStatsUpdate({ combo: 0 });
-      }
-
-      spawnAccumulatorRef.current += delta;
-      const spawnInterval = getSpawnInterval(scoreRef.current);
-      let spawned = 0;
-      while (spawnAccumulatorRef.current >= spawnInterval && spawned < 4) {
-        spawnFruit();
-        spawnAccumulatorRef.current -= spawnInterval;
-        spawned += 1;
-      }
-
-      const cutterTip = trailRef.current[trailRef.current.length - 1];
-      const cutterPrev = trailRef.current[trailRef.current.length - 2];
-
-      for (let i = fruitsRef.current.length - 1; i >= 0; i--) {
-        const fruit = fruitsRef.current[i];
-        fruit.x += fruit.vx * delta;
-        fruit.y += fruit.vy * delta;
-        fruit.vy += GRAVITY * delta;
-        fruit.rotation += fruit.rotationSpeed * delta;
-
-        let hit = false;
-        if (cutterTip && cutterPrev && !fruit.sliced) {
-          const hitRadius = fruit.radius + 10;
-          const distSq = distanceToSegmentSq(
-            fruit.x,
-            fruit.y,
-            cutterPrev.x,
-            cutterPrev.y,
-            cutterTip.x,
-            cutterTip.y
-          );
-          if (distSq < hitRadius * hitRadius) {
-            hit = true;
-          }
-        }
-
-        if (hit) {
-          if (fruit.type === 'bomb') {
-            createExplosion(fruit.x, fruit.y, COLORS.PARTICLE_BOMB, 30);
-            onGameOver(scoreRef.current);
-            return;
-          }
-
-          fruit.sliced = true;
-          createExplosion(fruit.x, fruit.y, COLORS.PARTICLE_FRUIT, 14);
-
-          const comboUpdate = updateComboOnSlice({
-            combo: comboRef.current,
-            maxCombo: maxComboRef.current,
-            lastSliceTime: lastSliceTimeRef.current,
-            now
-          });
-          comboRef.current = comboUpdate.combo;
-          maxComboRef.current = comboUpdate.maxCombo;
-          lastSliceTimeRef.current = comboUpdate.lastSliceTime;
-
-          scoreRef.current += comboUpdate.scoreDelta;
-          slicedRef.current += 1;
-
-          onStatsUpdate({
-            score: scoreRef.current,
-            combo: comboRef.current,
-            maxCombo: maxComboRef.current,
-            sliced: slicedRef.current
-          });
-
-          fruitsRef.current.splice(i, 1);
-          continue;
-        }
-
-        if (fruit.y > height + fruit.radius + 60) {
-          fruitsRef.current.splice(i, 1);
-          if (fruit.type === 'fruit') {
-            missedRef.current += 1;
-            const missResult = applyMiss(livesRef.current);
-            livesRef.current = missResult.lives;
-            onStatsUpdate({ missed: missedRef.current, lives: missResult.lives });
-            if (missResult.gameOver) {
-              onGameOver(scoreRef.current);
-              return;
-            }
-          }
-          continue;
-        }
-
-        ctx.save();
-        ctx.translate(fruit.x, fruit.y);
-        ctx.rotate(fruit.rotation);
-        ctx.beginPath();
-        ctx.arc(0, 0, fruit.radius, 0, Math.PI * 2);
-        ctx.fillStyle = fruit.color;
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(-fruit.radius / 3, -fruit.radius / 3, fruit.radius / 4, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        ctx.fill();
-        ctx.restore();
-      }
-
-      for (let i = particlesRef.current.length - 1; i >= 0; i--) {
-        const p = particlesRef.current[i];
-        p.x += p.vx * delta;
-        p.y += p.vy * delta;
-        p.vy += PARTICLE_GRAVITY * delta;
-        p.life -= PARTICLE_FADE * delta;
-        if (p.life <= 0) {
-          particlesRef.current.splice(i, 1);
-          continue;
-        }
-        ctx.globalAlpha = p.life;
-        ctx.fillStyle = p.color;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1.0;
-      }
-
       requestRef.current = requestAnimationFrame(loop);
     };
 
     requestRef.current = requestAnimationFrame(loop);
 
     return () => {
-      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      if (requestRef.current !== null) cancelAnimationFrame(requestRef.current);
     };
-  }, [gameState, width, height, settings, onStatsUpdate, onGameOver]);
+  }, [
+    gameState,
+    paused,
+    reducedMotion,
+    width,
+    height,
+    settings,
+    inputMode,
+    handPositionRef,
+    onStatsUpdate,
+    onGameOver
+  ]);
 
-  return (
-    <canvas
-      ref={canvasRef}
-      className="absolute top-0 left-0 w-full h-full z-10 pointer-events-none"
-    />
-  );
+  return <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none absolute inset-0 z-1" />;
 };
 
 export default GameLayer;

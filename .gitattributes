@@ -1,0 +1,5 @@
+# Keep the shared design tokens byte-identical to the canonical file (SHA-256 checked in tests).
+styles/ms-tokens.css text eol=lf
+
+# Vendored MediaPipe runtime and model: byte-identical to the npm package (checked in lib/visionAssets.test.ts).
+public/vision/** -text

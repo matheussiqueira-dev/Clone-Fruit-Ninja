@@ -1,0 +1,13 @@
+dist
+server/dist
+coverage
+test-results
+playwright-report
+public/vision
+package-lock.json
+# Copied byte-for-byte from the shared design system (SHA-256 checked in lib/designTokens.test.ts).
+styles/ms-tokens.css
+# Prose is written by hand; Prettier formats code and config only.
+*.md
+# Local editor state, including git worktrees with a full copy of the repo.
+.claude
