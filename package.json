@@ -35,7 +35,7 @@
   },
   "dependencies": {
     "@fontsource-variable/ibm-plex-sans": "5.3.0",
-    "@mediapipe/tasks-vision": "0.10.35",
+    "@mediapipe/tasks-vision": "1.1.1",
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "helmet": "^8.1.0",

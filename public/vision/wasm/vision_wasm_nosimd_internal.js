@@ -9,8 +9,7 @@ var ModuleFactory = (() => {
   // In EXPORT_ES6 mode we can just use 'import.meta.url'.
   var _scriptName = globalThis.document?.currentScript?.src;
   return async function(moduleArg = {}) {
-    var moduleRtn;
-
+    var Module = moduleArg;
 // include: shell.js
 // include: minimum_runtime_check.js
 // end include: minimum_runtime_check.js
@@ -27,8 +26,6 @@ var ModuleFactory = (() => {
 // after the generated code, you will need to define   var Module = {};
 // before the code. Then that object will be used in the code, and you
 // can continue to use Module afterwards as well.
-var Module = moduleArg;
-
 // Determine the runtime environment we are in. You can customize this by
 // setting the ENVIRONMENT setting at compile time (see settings.js).
 // Attempt to auto-detect the environment
@@ -42,7 +39,7 @@ var ENVIRONMENT_IS_NODE = globalThis.process?.versions?.node && globalThis.proce
 
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
-var arguments_ = [];
+var programArgs = [];
 
 var thisProgram = "./this.program";
 
@@ -92,7 +89,7 @@ if (ENVIRONMENT_IS_NODE) {
   if (process.argv.length > 1) {
     thisProgram = process.argv[1].replace(/\\/g, "/");
   }
-  arguments_ = process.argv.slice(2);
+  programArgs = process.argv.slice(2);
   quit_ = (status, toThrow) => {
     process.exitCode = status;
     throw toThrow;
@@ -196,8 +193,6 @@ var EXITSTATUS;
  */ var isFileURI = filename => filename.startsWith("file://");
 
 // include: runtime_common.js
-// include: runtime_stack_check.js
-// end include: runtime_stack_check.js
 // include: runtime_exceptions.js
 // Base Emscripten EH error class
 class EmscriptenEH {}
@@ -207,13 +202,20 @@ class EmscriptenSjLj extends EmscriptenEH {}
 // end include: runtime_exceptions.js
 // include: runtime_debug.js
 // end include: runtime_debug.js
-var readyPromiseResolve, readyPromiseReject;
-
 // Memory management
 var runtimeInitialized = false;
 
+// When ALLOW_MEMORY_GROWTH is enabled, the conversion from Wasm
+// memory to ArrayBuffer requires some additional logic.
+function getMemoryBuffer() {
+  return wasmMemory.buffer;
+}
+
 function updateMemoryViews() {
-  var b = wasmMemory.buffer;
+  // If we already have a heap that is resizeable/growable buffer we don't
+  // need to do anything in updateMemoryViews.
+  if (HEAP8?.buffer?.resizable) return;
+  var b = getMemoryBuffer();
   HEAP8 = new Int8Array(b);
   HEAP16 = new Int16Array(b);
   Module["HEAPU8"] = HEAPU8 = new Uint8Array(b);
@@ -228,11 +230,10 @@ function updateMemoryViews() {
 // end include: memoryprofiler.js
 // end include: runtime_common.js
 function preRun() {
-  if (Module["preRun"]) {
-    if (typeof Module["preRun"] == "function") Module["preRun"] = [ Module["preRun"] ];
-    while (Module["preRun"].length) {
-      addOnPreRun(Module["preRun"].shift());
-    }
+  var preRun = Module["preRun"];
+  if (preRun) {
+    if (typeof preRun == "function") preRun = [ preRun ];
+    onPreRuns.push(...preRun);
   }
   // Begin ATPRERUNS hooks
   callRuntimeCallbacks(onPreRuns);
@@ -244,18 +245,16 @@ function initRuntime() {
   if (!Module["noFSInit"] && !FS.initialized) FS.init();
   TTY.init();
   // End ATINITS hooks
-  wasmExports["id"]();
+  wasmExports["sd"]();
   // Begin ATPOSTCTORS hooks
   FS.ignorePermissions = false;
 }
 
 function postRun() {
-  // PThreads reuse the runtime from the main thread.
-  if (Module["postRun"]) {
-    if (typeof Module["postRun"] == "function") Module["postRun"] = [ Module["postRun"] ];
-    while (Module["postRun"].length) {
-      addOnPostRun(Module["postRun"].shift());
-    }
+  var postRun = Module["postRun"];
+  if (postRun) {
+    if (typeof postRun == "function") postRun = [ postRun ];
+    onPostRuns.push(...postRun);
   }
   // Begin ATPOSTRUNS hooks
   callRuntimeCallbacks(onPostRuns);
@@ -284,7 +283,6 @@ function postRun() {
   // though it can.
   // TODO(https://github.com/google/closure-compiler/pull/3913): Remove if/when upstream closure gets fixed.
   /** @suppress {checkTypes} */ var e = new WebAssembly.RuntimeError(what);
-  readyPromiseReject?.(e);
   // Throw the error whether or not MODULARIZE is set because abort is used
   // in code paths apart from instantiation where an exception is expected
   // to be thrown when abort is called.
@@ -298,9 +296,6 @@ function findWasmBinary() {
 }
 
 function getBinarySync(file) {
-  if (file == wasmBinaryFile && wasmBinary) {
-    return new Uint8Array(wasmBinary);
-  }
   if (readBinary) {
     return readBinary(file);
   }
@@ -365,7 +360,7 @@ async function createWasm() {
   // Load the wasm module and create an instance of using native support in the JS engine.
   // handle a generated wasm instance, receiving its exports and
   // performing other necessary setup
-  /** @param {WebAssembly.Module=} module*/ function receiveInstance(instance, module) {
+  function receiveInstance(instance) {
     wasmExports = instance.exports;
     assignWasmExports(wasmExports);
     updateMemoryViews();
@@ -386,11 +381,10 @@ async function createWasm() {
   // performing.
   // Also pthreads and wasm workers initialize the wasm instance through this
   // path.
-  if (Module["instantiateWasm"]) {
-    return new Promise((resolve, reject) => {
-      Module["instantiateWasm"](info, (inst, mod) => {
-        resolve(receiveInstance(inst, mod));
-      });
+  var instantiateWasm = Module["instantiateWasm"];
+  if (instantiateWasm) {
+    return new Promise(resolve => {
+      instantiateWasm(info, inst => resolve(receiveInstance(inst)));
     });
   }
   wasmBinaryFile ??= findWasmBinary();
@@ -470,7 +464,7 @@ var callUserCallback = func => {
 };
 
 function getFullscreenElement() {
-  return document.fullscreenElement || document.mozFullScreenElement || document.webkitFullscreenElement || document.webkitCurrentFullScreenElement || document.msFullscreenElement;
+  return document.fullscreenElement ?? document.webkitFullscreenElement;
 }
 
 /** @param {number=} timeout */ var safeSetTimeout = (func, timeout) => setTimeout(() => {
@@ -488,12 +482,15 @@ var warnOnce = text => {
 
 var preloadPlugins = [];
 
+/** @type {!Int32Array} */ var HEAP32;
+
+/** @type {!Uint32Array} */ var HEAPU32;
+
 var Browser = {
   useWebGL: false,
   isFullscreen: false,
   pointerLock: false,
   moduleContextCreatedCallbacks: [],
-  workers: [],
   preloadedImages: {},
   preloadedAudios: {},
   getCanvas: () => Module["canvas"],
@@ -560,7 +557,7 @@ var Browser = {
       var url = URL.createObjectURL(b);
       // XXX we never revoke this!
       var audio = new Audio;
-      audio.addEventListener("canplaythrough", () => finish(audio), false);
+      audio.addEventListener("canplaythrough", () => finish(audio));
       // use addEventListener due to chromium bug 124926
       audio.onerror = event => {
         if (done) return;
@@ -571,8 +568,8 @@ var Browser = {
           var ret = "";
           var leftchar = 0;
           var leftbits = 0;
-          for (var i = 0; i < data.length; i++) {
-            leftchar = (leftchar << 8) | data[i];
+          for (var byte of data) {
+            leftchar = (leftchar << 8) | byte;
             leftbits += 8;
             while (leftbits >= 6) {
               var curr = (leftchar >> (leftbits - 6)) & 63;
@@ -608,14 +605,14 @@ var Browser = {
     if (canvas) {
       // forced aspect ratio can be enabled by defining 'forcedAspectRatio' on Module
       // Module['forcedAspectRatio'] = 4 / 3;
-      document.addEventListener("pointerlockchange", pointerLockChange, false);
+      document.addEventListener("pointerlockchange", pointerLockChange);
       if (Module["elementPointerLock"]) {
         canvas.addEventListener("click", ev => {
           if (!Browser.pointerLock && Browser.getCanvas().requestPointerLock) {
             Browser.getCanvas().requestPointerLock();
             ev.preventDefault();
           }
-        }, false);
+        });
       }
     }
   },
@@ -689,32 +686,30 @@ var Browser = {
           Browser.updateCanvasDimensions(canvas);
         }
       }
-      Module["onFullScreen"]?.(Browser.isFullscreen);
-      Module["onFullscreen"]?.(Browser.isFullscreen);
     }
     if (!Browser.fullscreenHandlersInstalled) {
       Browser.fullscreenHandlersInstalled = true;
-      document.addEventListener("fullscreenchange", fullscreenChange, false);
-      document.addEventListener("mozfullscreenchange", fullscreenChange, false);
-      document.addEventListener("webkitfullscreenchange", fullscreenChange, false);
-      document.addEventListener("MSFullscreenChange", fullscreenChange, false);
+      document.addEventListener("fullscreenchange", fullscreenChange);
+      document.addEventListener("webkitfullscreenchange", fullscreenChange);
     }
     // create a new parent to ensure the canvas has no siblings. this allows browsers to optimize full screen performance when its parent is the full screen root
     var canvasContainer = document.createElement("div");
     canvas.parentNode.insertBefore(canvasContainer, canvas);
     canvasContainer.appendChild(canvas);
     // use parent of canvas as full screen root to allow aspect ratio correction (Firefox stretches the root to screen size)
-    canvasContainer.requestFullscreen = canvasContainer["requestFullscreen"] || canvasContainer["mozRequestFullScreen"] || canvasContainer["msRequestFullscreen"] || (canvasContainer["webkitRequestFullscreen"] ? () => canvasContainer["webkitRequestFullscreen"](Element["ALLOW_KEYBOARD_INPUT"]) : null) || (canvasContainer["webkitRequestFullScreen"] ? () => canvasContainer["webkitRequestFullScreen"](Element["ALLOW_KEYBOARD_INPUT"]) : null);
+    // Safari didn't support Element.requestFullscreen until 16.4
+    // See: https://developer.mozilla.org/en-US/docs/Web/API/Element/requestFullscreen
+    /** @suppress {checkTypes} */ canvasContainer.requestFullscreen ??= (canvasContainer["webkitRequestFullscreen"] ? () => canvasContainer["webkitRequestFullscreen"](Element.ALLOW_KEYBOARD_INPUT) : null) ?? (canvasContainer["webkitRequestFullScreen"] ? () => canvasContainer["webkitRequestFullScreen"](Element.ALLOW_KEYBOARD_INPUT) : null);
     canvasContainer.requestFullscreen();
   },
   exitFullscreen() {
     // This is workaround for chrome. Trying to exit from fullscreen
-    // not in fullscreen state will cause "TypeError: Document not active"
+    // not in fullscreen state will cause 'TypeError: Document not active'
     // in chrome. See https://github.com/emscripten-core/emscripten/pull/8236
     if (!Browser.isFullscreen) {
       return false;
     }
-    var CFS = document["exitFullscreen"] || document["cancelFullScreen"] || document["mozCancelFullScreen"] || document["msExitFullscreen"] || document["webkitCancelFullScreen"] || (() => {});
+    var CFS = document.exitFullscreen ?? document["webkitCancelFullScreen"];
     CFS.apply(document, []);
     return true;
   },
@@ -736,14 +731,7 @@ var Browser = {
     }[name.slice(name.lastIndexOf(".") + 1)];
   },
   getUserMedia(func) {
-    window.getUserMedia ||= navigator["getUserMedia"] || navigator["mozGetUserMedia"];
-    window.getUserMedia(func);
-  },
-  getMovementX(event) {
-    return event["movementX"] || event["mozMovementX"] || event["webkitMovementX"] || 0;
-  },
-  getMovementY(event) {
-    return event["movementY"] || event["mozMovementY"] || event["webkitMovementY"] || 0;
+    return navigator.mediaDevices.getUserMedia(func);
   },
   getMouseWheelDelta(event) {
     var delta = 0;
@@ -797,13 +785,8 @@ var Browser = {
     // in the coordinates.
     var canvas = Browser.getCanvas();
     var rect = canvas.getBoundingClientRect();
-    // Neither .scrollX or .pageXOffset are defined in a spec, but
-    // we prefer .scrollX because it is currently in a spec draft.
-    // (see: http://www.w3.org/TR/2013/WD-cssom-view-20131217/)
-    var scrollX = ((typeof window.scrollX != "undefined") ? window.scrollX : window.pageXOffset);
-    var scrollY = ((typeof window.scrollY != "undefined") ? window.scrollY : window.pageYOffset);
-    var adjustedX = pageX - (scrollX + rect.left);
-    var adjustedY = pageY - (scrollY + rect.top);
+    var adjustedX = pageX - (window.scrollX + rect.left);
+    var adjustedY = pageY - (window.scrollY + rect.top);
     // the canvas might be CSS-scaled compared to its backbuffer;
     // SDL-using content will want mouse coordinates in terms
     // of backbuffer units.
@@ -826,13 +809,8 @@ var Browser = {
     if (Browser.pointerLock) {
       // When the pointer is locked, calculate the coordinates
       // based on the movement of the mouse.
-      // Workaround for Firefox bug 764498
-      if (event.type != "mousemove" && ("mozMovementX" in event)) {
-        Browser.mouseMovementX = Browser.mouseMovementY = 0;
-      } else {
-        Browser.mouseMovementX = Browser.getMovementX(event);
-        Browser.mouseMovementY = Browser.getMovementY(event);
-      }
+      Browser.mouseMovementX = event.movementX;
+      Browser.mouseMovementY = event.movementY;
       // add the mouse delta to the current absolute mouse position
       Browser.mouseX += Browser.mouseMovementX;
       Browser.mouseY += Browser.mouseMovementY;
@@ -901,13 +879,6 @@ var Browser = {
     }
     var w = wNative;
     var h = hNative;
-    if (Module["forcedAspectRatio"] > 0) {
-      if (w / h < Module["forcedAspectRatio"]) {
-        w = Math.round(h * Module["forcedAspectRatio"]);
-      } else {
-        h = Math.round(w / Module["forcedAspectRatio"]);
-      }
-    }
     if ((getFullscreenElement() === canvas.parentNode) && (typeof screen != "undefined")) {
       var factor = Math.min(screen.width / w, screen.height / h);
       w = Math.round(w * factor);
@@ -936,21 +907,7 @@ var Browser = {
   }
 };
 
-/** @type {!Int16Array} */ var HEAP16;
-
-/** @type {!Int32Array} */ var HEAP32;
-
 /** @type {!Int8Array} */ var HEAP8;
-
-/** @type {!Float32Array} */ var HEAPF32;
-
-/** @type {!Float64Array} */ var HEAPF64;
-
-/** @type {!Uint16Array} */ var HEAPU16;
-
-/** @type {!Uint32Array} */ var HEAPU32;
-
-/** @type {!Uint8Array} */ var HEAPU8;
 
 var callRuntimeCallbacks = callbacks => {
   while (callbacks.length > 0) {
@@ -961,11 +918,7 @@ var callRuntimeCallbacks = callbacks => {
 
 var onPostRuns = [];
 
-var addOnPostRun = cb => onPostRuns.push(cb);
-
 var onPreRuns = [];
-
-var addOnPreRun = cb => onPreRuns.push(cb);
 
 var noExitRuntime = true;
 
@@ -1021,12 +974,16 @@ class ExceptionInfo {
 
 var uncaughtExceptionCount = 0;
 
+var __Unwind_RaiseException = ex => {
+  abort();
+};
+
 var ___cxa_throw = (ptr, type, destructor) => {
   var info = new ExceptionInfo(ptr);
   // Initialize ExceptionInfo content after it was allocated in __cxa_allocate_exception.
   info.init(type, destructor);
   uncaughtExceptionCount++;
-  abort();
+  __Unwind_RaiseException(ptr);
 };
 
 var PATH = {
@@ -1091,7 +1048,7 @@ var initRandomFill = () => {
   // This block is not needed on v19+ since crypto.getRandomValues is builtin
   if (ENVIRONMENT_IS_NODE) {
     var nodeCrypto = require("node:crypto");
-    return view => nodeCrypto.randomFillSync(view);
+    return view => (nodeCrypto.randomFillSync(view), 0);
   }
   return view => (crypto.getRandomValues(view), 0);
 };
@@ -1153,7 +1110,13 @@ var PATH_FS = {
 
 var UTF8Decoder = new TextDecoder;
 
-var findStringEnd = (heapOrArray, idx, maxBytesToRead, ignoreNul) => {
+/**
+   * heapOrArray is either a regular array, or a JavaScript typed array view.
+   * @param {number} idx
+   * @param {number=} maxBytesToRead
+   * @param {boolean=} ignoreNul
+   * @return {number}
+   */ var findStringEnd = (heapOrArray, idx, maxBytesToRead, ignoreNul) => {
   var maxIdx = idx + maxBytesToRead;
   if (ignoreNul) return maxIdx;
   // TextDecoder needs to know the byte length in advance, it doesn't stop on
@@ -1333,12 +1296,15 @@ var TTY = {
         } catch (e) {
           throw new FS.ErrnoError(29);
         }
-        if (result === undefined && bytesRead === 0) {
+        if (result === undefined && !bytesRead) {
           throw new FS.ErrnoError(6);
         }
         if (result === null || result === undefined) break;
         bytesRead++;
         buffer[offset + i] = result;
+        // We currently only support canonical mode (ICANON), where
+        // read(2) returns as soon as a line delimiter is read.
+        if (result === 10) break;
       }
       if (bytesRead) {
         stream.node.atime = Date.now();
@@ -1415,6 +1381,8 @@ var TTY = {
     }
   }
 };
+
+/** @type {!Uint8Array} */ var HEAPU8;
 
 var zeroMemory = (ptr, size) => HEAPU8.fill(0, ptr, ptr + size);
 
@@ -1664,7 +1632,7 @@ var MEMFS = {
       if (canOwn) {
         node.contents = buffer.subarray(offset, offset + length);
         node.usedBytes = length;
-      } else if (node.usedBytes === 0 && position === 0) {
+      } else if (!node.usedBytes && !position) {
         // If this is a simple first write to an empty file, do a fast set since we don't need to care about old data.
         node.contents = buffer.slice(offset, offset + length);
         node.usedBytes = length;
@@ -1777,23 +1745,26 @@ var FS_createDataFile = (...args) => FS.createDataFile(...args);
 
 var getUniqueRunDependency = id => id;
 
+var dependenciesPromise = null;
+
+var resolveRunDependencies = async () => dependenciesPromise;
+
 var runDependencies = 0;
 
-var dependenciesFulfilled = null;
+var dependenciesPromiseResolve = null;
 
 var removeRunDependency = id => {
   runDependencies--;
   Module["monitorRunDependencies"]?.(runDependencies);
-  if (runDependencies == 0) {
-    if (dependenciesFulfilled) {
-      var callback = dependenciesFulfilled;
-      dependenciesFulfilled = null;
-      callback();
-    }
+  if (!runDependencies) {
+    dependenciesPromiseResolve();
   }
 };
 
 var addRunDependency = id => {
+  if (!runDependencies) {
+    dependenciesPromise = new Promise(resolve => dependenciesPromiseResolve = resolve);
+  }
   runDependencies++;
   Module["monitorRunDependencies"]?.(runDependencies);
 };
@@ -1927,6 +1898,53 @@ var FS = {
     get isDevice() {
       return FS.isChrdev(this.mode);
     }
+    // The per-inode readiness wait-queue. The node carries a Set of listener
+    // entries {cb}; producers (SOCKFS, PIPEFS) call notifyListeners on a
+    // readiness transition, and poll()/epoll consume it. It lives on the node
+    // (not the fd) so dup'd fds share one queue. Only nodes that derive real
+    // readiness (sockets, pipes, and an epoll's own node) ever use this -
+    // always-ready types (regular files, ttys) never register or notify.
+    addListener(cb, exclusive = false) {
+      var entry = {
+        cb,
+        exclusive
+      };
+      var listeners = (this.listeners ??= new Set);
+      listeners.add(entry);
+      return {
+        listeners,
+        entry
+      };
+    }
+    notifyListeners(flags) {
+      // Iterates the set without copying, which is safe ONLY under a
+      // load-bearing contract that every internal listener must honour:
+      //   1. A listener must not run user code synchronously (a poll waiter only
+      //      resolves a Promise; an epoll registration only re-lists +
+      //      re-notifies; the epoll callback only schedules a tick). User code
+      //      runs on a later tick, never inside this loop.
+      //   2. A listener may delete entries only from ITS OWN waiter, never from
+      //      a sibling node's set that may be mid-iteration. (Deleting an entry
+      //      of the set being iterated here is fine - a Set tolerates removal of
+      //      a not-yet-visited entry mid-iteration; mutating a *different* node's
+      //      set is fine because that set is not being iterated.)
+      // Violating either gives silently skipped wakeups that are near-impossible
+      // to reproduce. Any new producer/listener must preserve it.
+      if (!this.listeners) return;
+      // Fire every non-exclusive listener. Among EPOLLEXCLUSIVE registrations
+      // (one fd watched by several epolls) wake only one, rotating round-robin
+      // per node, to avoid a thundering herd. (Only epoll registrations are ever
+      // exclusive; poll waiters and a node's own consumers are not.)
+      var excl;
+      for (var entry of this.listeners) {
+        if (entry.exclusive) (excl ||= []).push(entry); else entry.cb(flags);
+      }
+      if (excl) {
+        var i = (this.exclTurn || 0) % excl.length;
+        this.exclTurn = i + 1;
+        excl[i].cb(flags);
+      }
+    }
   },
   lookupPath(path, opts = {}) {
     if (!path) {
@@ -1936,7 +1954,7 @@ var FS = {
     if (!PATH.isAbs(path)) {
       path = FS.cwd() + "/" + path;
     }
-    // limit max consecutive symlinks to 40 (SYMLOOP_MAX).
+    // limit max consecutive symlinks to SYMLOOP_MAX.
     linkloop: for (var nlinks = 0; nlinks < 40; nlinks++) {
       // split the absolute path
       var parts = path.split("/").filter(p => !!p);
@@ -2219,7 +2237,14 @@ var FS = {
     var arg = setattr ? stream : node;
     setattr ??= node.node_ops.setattr;
     FS.checkOpExists(setattr, 63);
-    setattr(arg, attr);
+    try {
+      setattr(arg, attr);
+    } catch (e) {
+      if (e instanceof RangeError) {
+        throw new FS.ErrnoError(22);
+      }
+      throw e;
+    }
   },
   chrdev_stream_ops: {
     open(stream) {
@@ -2464,6 +2489,27 @@ var FS = {
       throw new FS.ErrnoError(63);
     }
     return parent.node_ops.symlink(parent, newname, oldpath);
+  },
+  link(oldpath, newpath, flags) {
+    var lookup = FS.lookupPath(newpath, {
+      parent: true
+    });
+    var parent = lookup.node;
+    if (!parent) {
+      throw new FS.ErrnoError(44);
+    }
+    var newname = PATH.basename(newpath);
+    var errCode = FS.mayCreate(parent, newname);
+    if (errCode) {
+      throw new FS.ErrnoError(errCode);
+    }
+    // Hardlinks are only supported by filesystem backends that provide a
+    // `link` node op (e.g. NODERAWFS backed by the host). NODEFS omits it:
+    // a host hardlink cannot be confined to the mount root.
+    if (!parent.node_ops.link) {
+      throw new FS.ErrnoError(34);
+    }
+    return parent.node_ops.link(parent, newname, oldpath, flags);
   },
   rename(old_path, new_path) {
     var old_dirname = PATH.dirname(old_path);
@@ -2722,15 +2768,14 @@ var FS = {
     }
     FS.doTruncate(stream, stream.node, len);
   },
-  utime(path, atime, mtime) {
+  utime(path, atime, mtime, dontFollow) {
     var lookup = FS.lookupPath(path, {
-      follow: true
+      follow: !dontFollow
     });
-    var node = lookup.node;
-    var setattr = FS.checkOpExists(node.node_ops.setattr, 63);
-    setattr(node, {
+    FS.doSetAttr(null, lookup.node, {
       atime,
-      mtime
+      mtime,
+      dontFollow
     });
   },
   open(path, flags, mode = 438) {
@@ -2832,6 +2877,11 @@ var FS = {
     }
     if (stream.getdents) stream.getdents = null;
     // free readdir state
+    // The fd is going away: wake anything waiting on it (poll/epoll) with
+    // POLLNVAL so a blocking wait unblocks and an epoll registration is evicted
+    // on its next derive. Only sockets/pipes/epoll ever carry a wait-queue, so
+    // for every other stream (incl. nodeless noderawfs stdio) this is a no-op.
+    stream.node?.notifyListeners(32);
     try {
       if (stream.stream_ops.close) {
         stream.stream_ops.close(stream);
@@ -2923,7 +2973,7 @@ var FS = {
     // to write to file opened in read-only mode with MAP_PRIVATE flag,
     // as all modifications will be visible only in the memory of
     // the current process.
-    if ((prot & 2) !== 0 && (flags & 2) === 0 && (stream.flags & 2097155) !== 2) {
+    if ((prot & 2) && !(flags & 2) && (stream.flags & 2097155) !== 2) {
       throw new FS.ErrnoError(2);
     }
     if ((stream.flags & 2097155) === 1) {
@@ -2950,8 +3000,8 @@ var FS = {
     return stream.stream_ops.ioctl(stream, cmd, arg);
   },
   readFile(path, opts = {}) {
-    opts.flags = opts.flags || 0;
-    opts.encoding = opts.encoding || "binary";
+    opts.flags = opts.flags ?? 0;
+    opts.encoding = opts.encoding ?? "binary";
     if (opts.encoding !== "utf8" && opts.encoding !== "binary") {
       abort(`Invalid encoding type "${opts.encoding}"`);
     }
@@ -2967,7 +3017,7 @@ var FS = {
     return buf;
   },
   writeFile(path, data, opts = {}) {
-    opts.flags = opts.flags || 577;
+    opts.flags = opts.flags ?? 577;
     var stream = FS.open(path, opts.flags, opts.mode);
     data = FS_fileDataToTypedArray(data);
     FS.write(stream, data, 0, data.byteLength, undefined, opts.canOwn);
@@ -3016,7 +3066,7 @@ var FS = {
     // use a buffer to avoid overhead of individual crypto calls per byte
     var randomBuffer = new Uint8Array(1024), randomLeft = 0;
     var randomByte = () => {
-      if (randomLeft === 0) {
+      if (!randomLeft) {
         randomFill(randomBuffer);
         randomLeft = randomBuffer.byteLength;
       }
@@ -3235,7 +3285,7 @@ var FS = {
           } catch (e) {
             throw new FS.ErrnoError(29);
           }
-          if (result === undefined && bytesRead === 0) {
+          if (result === undefined && !bytesRead) {
             throw new FS.ErrnoError(6);
           }
           if (result === null || result === undefined) break;
@@ -3299,7 +3349,7 @@ var FS = {
         var xhr = new XMLHttpRequest;
         xhr.open("HEAD", url, false);
         xhr.send(null);
-        if (!(xhr.status >= 200 && xhr.status < 300 || xhr.status === 304)) abort("Couldn't load " + url + ". Status: " + xhr.status);
+        if (!(xhr.status >= 200 && xhr.status < 300 || xhr.status === 304)) abort(`Couldn't load ${url}. Status: ${xhr.status}`);
         var datalength = Number(xhr.getResponseHeader("Content-length"));
         var header;
         var hasByteServing = (header = xhr.getResponseHeader("Accept-Ranges")) && header === "bytes";
@@ -3309,23 +3359,23 @@ var FS = {
         if (!hasByteServing) chunkSize = datalength;
         // Function to get a range from the remote URL.
         var doXHR = (from, to) => {
-          if (from > to) abort("invalid range (" + from + ", " + to + ") or no bytes requested!");
-          if (to > datalength - 1) abort("only " + datalength + " bytes available! programmer error!");
+          if (from > to) abort(`invalid range (${from}, ${to}) or no bytes requested!`);
+          if (to > datalength - 1) abort(`only ${datalength} bytes available! programmer error!`);
           // TODO: Use mozResponseArrayBuffer, responseStream, etc. if available.
           var xhr = new XMLHttpRequest;
           xhr.open("GET", url, false);
-          if (datalength !== chunkSize) xhr.setRequestHeader("Range", "bytes=" + from + "-" + to);
+          if (datalength !== chunkSize) xhr.setRequestHeader("Range", `bytes=${from}-${to}`);
           // Some hints to the browser that we want binary data.
           xhr.responseType = "arraybuffer";
           if (xhr.overrideMimeType) {
             xhr.overrideMimeType("text/plain; charset=x-user-defined");
           }
           xhr.send(null);
-          if (!(xhr.status >= 200 && xhr.status < 300 || xhr.status === 304)) abort("Couldn't load " + url + ". Status: " + xhr.status);
+          if (!(xhr.status >= 200 && xhr.status < 300 || xhr.status === 304)) abort(`Couldn't load ${url}. Status: ${xhr.status}`);
           if (xhr.response !== undefined) {
             return new Uint8Array(/** @type{Array<number>} */ (xhr.response || []));
           }
-          return intArrayFromString(xhr.responseText || "", true);
+          return intArrayFromString(xhr.responseText ?? "", true);
         };
         var lazyArray = this;
         lazyArray.setDataGetter(chunkNum => {
@@ -3463,6 +3513,7 @@ var FS = {
 };
 
 var SYSCALLS = {
+  currentUmask: 18,
   calculateAt(dirfd, path, allowEmpty) {
     if (PATH.isAbs(path)) {
       return path;
@@ -3539,7 +3590,7 @@ var SYSCALLS = {
       // MAP_PRIVATE calls need not to be synced back to underlying fs
       return 0;
     }
-    var buffer = HEAPU8.slice(addr, addr + len);
+    var buffer = HEAPU8.subarray(addr, addr + len);
     FS.msync(stream, buffer, offset, len, flags);
   },
   getStreamFromFD(fd) {
@@ -3601,6 +3652,8 @@ var syscallGetVarargI = () => {
 
 var syscallGetVarargP = syscallGetVarargI;
 
+/** @type {!Int16Array} */ var HEAP16;
+
 function ___syscall_fcntl64(fd, cmd, varargs) {
   SYSCALLS.varargs = varargs;
   try {
@@ -3631,7 +3684,8 @@ function ___syscall_fcntl64(fd, cmd, varargs) {
      case 4:
       {
         var arg = syscallGetVarargI();
-        stream.flags |= arg;
+        var mask = 289792;
+        stream.flags = (stream.flags & ~mask) | (arg & mask);
         return 0;
       }
 
@@ -3673,7 +3727,7 @@ var convertI32PairToI53Checked = (lo, hi) => ((hi + 2097152) >>> 0 < 4194305 - !
 function ___syscall_ftruncate64(fd, length_low, length_high) {
   var length = convertI32PairToI53Checked(length_low, length_high);
   try {
-    if (isNaN(length)) return -61;
+    if (isNaN(length)) return -22;
     FS.ftruncate(fd, length);
     return 0;
   } catch (e) {
@@ -3681,6 +3735,82 @@ function ___syscall_ftruncate64(fd, length_low, length_high) {
     return -e.errno;
   }
 }
+
+var stringToUTF8 = (str, outPtr, maxBytesToWrite) => stringToUTF8Array(str, HEAPU8, outPtr, maxBytesToWrite);
+
+function ___syscall_getcwd(buf, size) {
+  try {
+    if (!size) return -28;
+    var cwd = FS.cwd();
+    var cwdLengthInBytes = lengthBytesUTF8(cwd) + 1;
+    if (size < cwdLengthInBytes) return -68;
+    stringToUTF8(cwd, buf, size);
+    return cwdLengthInBytes;
+  } catch (e) {
+    if (typeof FS == "undefined" || !(e.name === "ErrnoError")) throw e;
+    return -e.errno;
+  }
+}
+
+function ___syscall_getdents64(fd, dirp, count) {
+  try {
+    var stream = SYSCALLS.getStreamFromFD(fd);
+    stream.getdents ||= FS.readdir(stream.path);
+    var struct_size = 280;
+    var pos = 0;
+    var off = FS.llseek(stream, 0, 1);
+    var startIdx = Math.floor(off / struct_size);
+    var endIdx = Math.min(stream.getdents.length, startIdx + Math.floor(count / struct_size));
+    for (var idx = startIdx; idx < endIdx; idx++) {
+      var id;
+      var type;
+      var name = stream.getdents[idx];
+      if (name === ".") {
+        id = stream.node.id;
+        type = 4;
+      } else if (name === "..") {
+        var lookup = FS.lookupPath(stream.path, {
+          parent: true
+        });
+        id = lookup.node.id;
+        type = 4;
+      } else {
+        var child;
+        try {
+          child = FS.lookupNode(stream.node, name);
+        } catch (e) {
+          // If the entry is not a directory, file, or symlink, nodefs
+          // lookupNode will raise EINVAL. Skip these and continue.
+          if (e?.errno === 28) {
+            continue;
+          }
+          throw e;
+        }
+        id = child.id;
+        type = FS.isChrdev(child.mode) ? 2 : // character device.
+        FS.isDir(child.mode) ? 4 : // directory
+        FS.isLink(child.mode) ? 10 : // symbolic link.
+        8;
+      }
+      (tempI64 = [ id >>> 0, (tempDouble = id, (+(Math.abs(tempDouble))) >= 1 ? (tempDouble > 0 ? (+(Math.floor((tempDouble) / 4294967296))) >>> 0 : (~~((+(Math.ceil((tempDouble - +(((~~(tempDouble))) >>> 0)) / 4294967296))))) >>> 0) : 0) ], 
+      HEAP32[((dirp + pos) >> 2)] = tempI64[0], HEAP32[(((dirp + pos) + (4)) >> 2)] = tempI64[1]);
+      (tempI64 = [ (idx + 1) * struct_size >>> 0, (tempDouble = (idx + 1) * struct_size, 
+      (+(Math.abs(tempDouble))) >= 1 ? (tempDouble > 0 ? (+(Math.floor((tempDouble) / 4294967296))) >>> 0 : (~~((+(Math.ceil((tempDouble - +(((~~(tempDouble))) >>> 0)) / 4294967296))))) >>> 0) : 0) ], 
+      HEAP32[(((dirp + pos) + (8)) >> 2)] = tempI64[0], HEAP32[(((dirp + pos) + (12)) >> 2)] = tempI64[1]);
+      HEAP16[(((dirp + pos) + (16)) >> 1)] = 280;
+      HEAP8[(dirp + pos) + (18)] = type;
+      stringToUTF8(name, dirp + pos + 19, 256);
+      pos += struct_size;
+    }
+    FS.llseek(stream, idx * struct_size, 0);
+    return pos;
+  } catch (e) {
+    if (typeof FS == "undefined" || !(e.name === "ErrnoError")) throw e;
+    return -e.errno;
+  }
+}
+
+var ___syscall_getuid32 = () => 0;
 
 function ___syscall_ioctl(fd, op, varargs) {
   SYSCALLS.varargs = varargs;
@@ -3814,6 +3944,19 @@ function ___syscall_lstat64(path, buf) {
   }
 }
 
+function ___syscall_mkdirat(dirfd, path, mode) {
+  try {
+    path = SYSCALLS.getStr(path);
+    path = SYSCALLS.calculateAt(dirfd, path);
+    mode &= ~SYSCALLS.currentUmask;
+    FS.mkdir(path, mode, 0);
+    return 0;
+  } catch (e) {
+    if (typeof FS == "undefined" || !(e.name === "ErrnoError")) throw e;
+    return -e.errno;
+  }
+}
+
 function ___syscall_newfstatat(dirfd, path, buf, flags) {
   try {
     path = SYSCALLS.getStr(path);
@@ -3834,7 +3977,40 @@ function ___syscall_openat(dirfd, path, flags, varargs) {
     path = SYSCALLS.getStr(path);
     path = SYSCALLS.calculateAt(dirfd, path);
     var mode = varargs ? syscallGetVarargI() : 0;
+    if (flags & 64) {
+      mode &= ~SYSCALLS.currentUmask;
+    }
     return FS.open(path, flags, mode).fd;
+  } catch (e) {
+    if (typeof FS == "undefined" || !(e.name === "ErrnoError")) throw e;
+    return -e.errno;
+  }
+}
+
+function ___syscall_readlinkat(dirfd, path, buf, bufsize) {
+  try {
+    path = SYSCALLS.getStr(path);
+    path = SYSCALLS.calculateAt(dirfd, path);
+    if (bufsize <= 0) return -28;
+    var ret = FS.readlink(path);
+    var len = Math.min(bufsize, lengthBytesUTF8(ret));
+    var endChar = HEAP8[buf + len];
+    stringToUTF8(ret, buf, bufsize + 1);
+    // readlink is one of the rare functions that write out a C string, but does never append a null to the output buffer(!)
+    // stringToUTF8() always appends a null byte, so restore the character under the null byte after the write.
+    HEAP8[buf + len] = endChar;
+    return len;
+  } catch (e) {
+    if (typeof FS == "undefined" || !(e.name === "ErrnoError")) throw e;
+    return -e.errno;
+  }
+}
+
+function ___syscall_rmdir(path) {
+  try {
+    path = SYSCALLS.getStr(path);
+    FS.rmdir(path);
+    return 0;
   } catch (e) {
     if (typeof FS == "undefined" || !(e.name === "ErrnoError")) throw e;
     return -e.errno;
@@ -3845,6 +4021,68 @@ function ___syscall_stat64(path, buf) {
   try {
     path = SYSCALLS.getStr(path);
     return SYSCALLS.writeStat(buf, FS.stat(path));
+  } catch (e) {
+    if (typeof FS == "undefined" || !(e.name === "ErrnoError")) throw e;
+    return -e.errno;
+  }
+}
+
+function ___syscall_unlinkat(dirfd, path, flags) {
+  try {
+    path = SYSCALLS.getStr(path);
+    path = SYSCALLS.calculateAt(dirfd, path);
+    if (!flags) {
+      FS.unlink(path);
+    } else if (flags === 512) {
+      FS.rmdir(path);
+    } else {
+      return -28;
+    }
+    return 0;
+  } catch (e) {
+    if (typeof FS == "undefined" || !(e.name === "ErrnoError")) throw e;
+    return -e.errno;
+  }
+}
+
+var readI53FromI64 = ptr => HEAPU32[((ptr) >> 2)] + HEAP32[(((ptr) + (4)) >> 2)] * 4294967296;
+
+function ___syscall_utimensat(dirfd, path, times, flags) {
+  try {
+    var nofollow = flags & 256;
+    path = SYSCALLS.getStr(path);
+    path = SYSCALLS.calculateAt(dirfd, path, true);
+    var now = Date.now(), atime, mtime;
+    if (!times) {
+      atime = now;
+      mtime = now;
+    } else {
+      var seconds = readI53FromI64(times);
+      var nanoseconds = HEAP32[(((times) + (8)) >> 2)];
+      if (nanoseconds == 1073741823) {
+        atime = now;
+      } else if (nanoseconds == 1073741822) {
+        atime = null;
+      } else {
+        atime = (seconds * 1e3) + (nanoseconds / (1e3 * 1e3));
+      }
+      times += 16;
+      seconds = readI53FromI64(times);
+      nanoseconds = HEAP32[(((times) + (8)) >> 2)];
+      if (nanoseconds == 1073741823) {
+        mtime = now;
+      } else if (nanoseconds == 1073741822) {
+        mtime = null;
+      } else {
+        mtime = (seconds * 1e3) + (nanoseconds / (1e3 * 1e3));
+      }
+    }
+    // null here means UTIME_OMIT was passed. If both were set to UTIME_OMIT then
+    // we can skip the call completely.
+    if ((mtime ?? atime) !== null) {
+      FS.utime(path, atime, mtime, nofollow);
+    }
+    return 0;
   } catch (e) {
     if (typeof FS == "undefined" || !(e.name === "ErrnoError")) throw e;
     return -e.errno;
@@ -3870,12 +4108,12 @@ var registeredTypes = {};
 
 var typeDependencies = {};
 
-var BindingError = class BindingError extends Error {
+class BindingError extends Error {
   constructor(message) {
     super(message);
     this.name = "BindingError";
   }
-};
+}
 
 var throwBindingError = message => {
   throw new BindingError(message);
@@ -3987,6 +4225,10 @@ var EmValType = {
 
 var __embind_register_emval = rawType => registerType(rawType, EmValType);
 
+/** @type {!Float32Array} */ var HEAPF32;
+
+/** @type {!Float64Array} */ var HEAPF64;
+
 var floatReadValueFromPointer = (name, width) => {
   switch (width) {
    case 4:
@@ -4014,6 +4256,8 @@ var __embind_register_float = (rawType, name, size) => {
     destructorFunction: null
   });
 };
+
+/** @type {!Uint16Array} */ var HEAPU16;
 
 var integerReadValueFromPointer = (name, width, signed) => {
   // integers are quite common, so generate very specialized functions
@@ -4067,8 +4311,6 @@ var __embind_register_memory_view = (rawType, dataTypeIndex, name) => {
     ignoreDuplicateRegistrations: true
   });
 };
-
-var stringToUTF8 = (str, outPtr, maxBytesToWrite) => stringToUTF8Array(str, HEAPU8, outPtr, maxBytesToWrite);
 
 var __embind_register_std_string = (rawType, name) => {
   name = AsciiToString(name);
@@ -4147,9 +4389,7 @@ var UTF16ToString = (ptr, maxBytesToRead, ignoreNul) => {
   return UTF16Decoder.decode(HEAPU16.subarray(idx, endIdx));
 };
 
-var stringToUTF16 = (str, outPtr, maxBytesToWrite) => {
-  // Backwards compatibility: if max bytes is not specified, assume unsafe unbounded write is allowed.
-  maxBytesToWrite ??= 2147483647;
+var stringToUTF16 = (str, outPtr, maxBytesToWrite = 2147483647) => {
   if (maxBytesToWrite < 2) return 0;
   maxBytesToWrite -= 2;
   // Null terminator.
@@ -4182,9 +4422,7 @@ var UTF32ToString = (ptr, maxBytesToRead, ignoreNul) => {
   return str;
 };
 
-var stringToUTF32 = (str, outPtr, maxBytesToWrite) => {
-  // Backwards compatibility: if max bytes is not specified, assume unsafe unbounded write is allowed.
-  maxBytesToWrite ??= 2147483647;
+var stringToUTF32 = (str, outPtr, maxBytesToWrite = 2147483647) => {
   if (maxBytesToWrite < 4) return 0;
   var startPtr = outPtr;
   var endPtr = startPtr + maxBytesToWrite - 4;
@@ -4425,6 +4663,9 @@ var __emval_typeof = handle => {
 function __gmtime_js(time_low, time_high, tmPtr) {
   var time = convertI32PairToI53Checked(time_low, time_high);
   var date = new Date(time * 1e3);
+  if (isNaN(date.getTime())) {
+    return 1;
+  }
   HEAP32[((tmPtr) >> 2)] = date.getUTCSeconds();
   HEAP32[(((tmPtr) + (4)) >> 2)] = date.getUTCMinutes();
   HEAP32[(((tmPtr) + (8)) >> 2)] = date.getUTCHours();
@@ -4435,6 +4676,7 @@ function __gmtime_js(time_low, time_high, tmPtr) {
   var start = Date.UTC(date.getUTCFullYear(), 0, 1, 0, 0, 0, 0);
   var yday = ((date.getTime() - start) / (1e3 * 60 * 60 * 24)) | 0;
   HEAP32[(((tmPtr) + (28)) >> 2)] = yday;
+  return 0;
 }
 
 var isLeapYear = year => year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
@@ -4454,6 +4696,9 @@ var ydayFromDate = date => {
 function __localtime_js(time_low, time_high, tmPtr) {
   var time = convertI32PairToI53Checked(time_low, time_high);
   var date = new Date(time * 1e3);
+  if (isNaN(date.getTime())) {
+    return 1;
+  }
   HEAP32[((tmPtr) >> 2)] = date.getSeconds();
   HEAP32[(((tmPtr) + (4)) >> 2)] = date.getMinutes();
   HEAP32[(((tmPtr) + (8)) >> 2)] = date.getHours();
@@ -4470,6 +4715,7 @@ function __localtime_js(time_low, time_high, tmPtr) {
   var winterOffset = start.getTimezoneOffset();
   var dst = (summerOffset != winterOffset && date.getTimezoneOffset() == Math.min(winterOffset, summerOffset)) | 0;
   HEAP32[(((tmPtr) + (32)) >> 2)] = dst;
+  return 0;
 }
 
 var setTempRet0 = val => __emscripten_tempret_set(val);
@@ -4477,6 +4723,9 @@ var setTempRet0 = val => __emscripten_tempret_set(val);
 var __mktime_js = function(tmPtr) {
   var ret = (() => {
     var date = new Date(HEAP32[(((tmPtr) + (20)) >> 2)] + 1900, HEAP32[(((tmPtr) + (16)) >> 2)], HEAP32[(((tmPtr) + (12)) >> 2)], HEAP32[(((tmPtr) + (8)) >> 2)], HEAP32[(((tmPtr) + (4)) >> 2)], HEAP32[((tmPtr) >> 2)], 0);
+    if (isNaN(date.getTime())) {
+      return -1;
+    }
     // There's an ambiguous hour when the time goes back; the tm_isdst field is
     // used to disambiguate it.  Date() basically guesses, so we fix it up if it
     // guessed wrong, or fill in tm_isdst with the guess if it's -1.
@@ -4489,13 +4738,17 @@ var __mktime_js = function(tmPtr) {
     // DST is in December in South
     if (dst < 0) {
       // Attention: some regions don't have DST at all.
-      HEAP32[(((tmPtr) + (32)) >> 2)] = Number(summerOffset != winterOffset && dstOffset == guessedOffset);
+      dst = Number(summerOffset != winterOffset && dstOffset == guessedOffset);
     } else if ((dst > 0) != (dstOffset == guessedOffset)) {
       var nonDstOffset = Math.max(winterOffset, summerOffset);
       var trueOffset = dst > 0 ? dstOffset : nonDstOffset;
       // Don't try setMinutes(date.getMinutes() + ...) -- it's messed up.
       date.setTime(date.getTime() + (trueOffset - guessedOffset) * 6e4);
+      if (isNaN(date.getTime())) {
+        return -1;
+      }
     }
+    HEAP32[(((tmPtr) + (32)) >> 2)] = dst;
     HEAP32[(((tmPtr) + (24)) >> 2)] = date.getDay();
     var yday = ydayFromDate(date) | 0;
     HEAP32[(((tmPtr) + (28)) >> 2)] = yday;
@@ -4506,12 +4759,8 @@ var __mktime_js = function(tmPtr) {
     HEAP32[(((tmPtr) + (12)) >> 2)] = date.getDate();
     HEAP32[(((tmPtr) + (16)) >> 2)] = date.getMonth();
     HEAP32[(((tmPtr) + (20)) >> 2)] = date.getYear();
-    var timeMs = date.getTime();
-    if (isNaN(timeMs)) {
-      return -1;
-    }
-    // Return time in microseconds
-    return timeMs / 1e3;
+    // Return time in seconds
+    return date.getTime() / 1e3;
   })();
   return (setTempRet0((tempDouble = ret, (+(Math.abs(tempDouble))) >= 1 ? (tempDouble > 0 ? (+(Math.floor((tempDouble) / 4294967296))) >>> 0 : (~~((+(Math.ceil((tempDouble - +(((~~(tempDouble))) >>> 0)) / 4294967296))))) >>> 0) : 0)), 
   ret >>> 0);
@@ -4805,7 +5054,7 @@ var _emscripten_stack_unwind_buffer = (addr, buffer, count) => {
     ++offset;
   }
   for (var i = 0; i < count && stack[i + offset]; ++i) {
-    HEAP32[(((buffer) + (i * 4)) >> 2)] = convertFrameToPC(stack[i + offset]);
+    HEAPU32[(((buffer) + (i * 4)) >> 2)] = convertFrameToPC(stack[i + offset]);
   }
   return i;
 };
@@ -4869,12 +5118,20 @@ var getEmscriptenSupportedExtensions = ctx => {
   "EXT_color_buffer_float", "EXT_conservative_depth", "EXT_disjoint_timer_query_webgl2", "EXT_texture_norm16", "NV_shader_noperspective_interpolation", "WEBGL_clip_cull_distance", // WebGL 1 and WebGL 2 extensions
   "EXT_clip_control", "EXT_color_buffer_half_float", "EXT_depth_clamp", "EXT_float_blend", "EXT_polygon_offset_clamp", "EXT_texture_compression_bptc", "EXT_texture_compression_rgtc", "EXT_texture_filter_anisotropic", "KHR_parallel_shader_compile", "OES_texture_float_linear", "WEBGL_blend_func_extended", "WEBGL_compressed_texture_astc", "WEBGL_compressed_texture_etc", "WEBGL_compressed_texture_etc1", "WEBGL_compressed_texture_s3tc", "WEBGL_compressed_texture_s3tc_srgb", "WEBGL_debug_renderer_info", "WEBGL_debug_shaders", "WEBGL_lose_context", "WEBGL_multi_draw", "WEBGL_polygon_mode" ];
   // .getSupportedExtensions() can return null if context is lost, so coerce to empty array.
-  return (ctx.getSupportedExtensions() || []).filter(ext => supportedExtensions.includes(ext));
+  return ctx.getSupportedExtensions()?.filter(ext => supportedExtensions.includes(ext)) ?? [];
 };
 
 var registerPreMainLoop = f => {
   // Does nothing unless $MainLoop is included/used.
   typeof MainLoop != "undefined" && MainLoop.preMainLoop.push(f);
+};
+
+var webglBufferSubData = (target, offset, size, data, src = HEAPU8) => {
+  if (GL.currentContext.version >= 2) {
+    size && GLctx.bufferSubData(target, offset, src, data, size);
+    return;
+  }
+  GLctx.bufferSubData(target, offset, src.subarray(data, data + size));
 };
 
 var GL = {
@@ -4931,7 +5188,7 @@ var GL = {
   },
   MAX_TEMP_BUFFER_SIZE: 2097152,
   numTempVertexBuffersPerSize: 64,
-  log2ceilLookup: i => 32 - Math.clz32(i === 0 ? 0 : i - 1),
+  log2ceilLookup: i => 32 - Math.clz32(i ? i - 1 : 0),
   generateTempBuffers: (quads, context) => {
     var largestIndex = GL.log2ceilLookup(GL.MAX_TEMP_BUFFER_SIZE);
     context.tempVertexBufferCounters1 = [];
@@ -5053,7 +5310,7 @@ var GL = {
       var size = GL.calcBufLength(cb.size, cb.type, cb.stride, count);
       var buf = GL.getTempVertexBuffer(size);
       GLctx.bindBuffer(34962, buf);
-      GLctx.bufferSubData(34962, 0, HEAPU8.subarray(cb.ptr, cb.ptr + size));
+      webglBufferSubData(34962, 0, size, cb.ptr);
       cb.vertexAttribPointerAdaptor.call(GLctx, i, cb.size, cb.type, cb.normalized, cb.stride, 0);
     }
   },
@@ -5192,7 +5449,7 @@ var webglPowerPreferences = [ "default", "low-power", "high-performance" ];
 /** @type {Object} */ var specialHTMLTargets = [ 0, globalThis.document ?? 0, globalThis.window ?? 0 ];
 
 var findEventTarget = target => {
-  // The sensible "default" target varies between events, but use window as the default
+  // The sensible 'default' target varies between events, but use window as the default
   // since DOM events mostly can default to that. Specific callback registrations
   // override their own defaults.
   if (!target) return window;
@@ -5224,6 +5481,7 @@ var _emscripten_webgl_do_create_context = (target, attributes) => {
     "preserveDrawingBuffer": !!HEAP8[attributes + 5],
     "powerPreference": webglPowerPreferences[powerPreference],
     "failIfMajorPerformanceCaveat": !!HEAP8[attributes + 12],
+    "desynchronized": !!HEAP8[attributes + 33],
     // The following are not predefined WebGL context attributes in the WebGL specification, so the property names can be minified by Closure.
     majorVersion: HEAP32[attr32 + (16 >> 2)],
     minorVersion: HEAP32[attr32 + (20 >> 2)],
@@ -5265,6 +5523,7 @@ var _emscripten_webgl_get_context_attributes = (c, a) => {
   var power = t["powerPreference"] && webglPowerPreferences.indexOf(t["powerPreference"]);
   HEAP32[(((a) + (8)) >> 2)] = power;
   HEAP8[(a) + (12)] = t.failIfMajorPerformanceCaveat;
+  HEAP8[(a) + (33)] = t.desynchronized;
   HEAP32[(((a) + (16)) >> 2)] = c.version;
   HEAP32[(((a) + (20)) >> 2)] = 0;
   HEAP8[(a) + (24)] = c.attributes.enableExtensionsByDefault;
@@ -5294,8 +5553,6 @@ var writeI53ToI64 = (ptr, num) => {
   var lower = HEAPU32[((ptr) >> 2)];
   HEAPU32[(((ptr) + (4)) >> 2)] = (num - lower) / 4294967296;
 };
-
-var readI53FromI64 = ptr => HEAPU32[((ptr) >> 2)] + HEAP32[(((ptr) + (4)) >> 2)] * 4294967296;
 
 var wasmTableMirror = [];
 
@@ -5769,6 +6026,28 @@ var WebGPU = {
     HEAP32[(((infoStruct) + (40)) >> 2)] = adapterType;
     HEAPU32[(((infoStruct) + (44)) >> 2)] = 0;
     HEAPU32[(((infoStruct) + (48)) >> 2)] = 0;
+    WebGPU.iterateExtensions(infoStruct, {
+      327739: ext => {
+        let configCount = 0;
+        let configsPtr = 0;
+        if (info.subgroupMatrixConfigs) {
+          configCount = info.subgroupMatrixConfigs.length;
+          configsPtr = _malloc(configCount * 28);
+          for (const [i, cfg] of info.subgroupMatrixConfigs.entries()) {
+            const ptr = configsPtr + i * 28;
+            const componentType = WebGPU.SubgroupMatrixComponentType.indexOf(cfg.componentType);
+            const resultComponentType = WebGPU.SubgroupMatrixComponentType.indexOf(cfg.resultComponentType);
+            HEAP32[((ptr) >> 2)] = componentType;
+            HEAP32[(((ptr) + (4)) >> 2)] = resultComponentType;
+            HEAPU32[(((ptr) + (8)) >> 2)] = cfg.M;
+            HEAPU32[(((ptr) + (12)) >> 2)] = cfg.N;
+            HEAPU32[(((ptr) + (16)) >> 2)] = cfg.K;
+          }
+        }
+        HEAPU32[(((ext) + (12)) >> 2)] = configsPtr;
+        HEAPU32[(((ext) + (8)) >> 2)] = configCount;
+      }
+    });
   },
   AddressMode: [ , "clamp-to-edge", "repeat", "mirror-repeat" ],
   BlendFactor: [ , "zero", "one", "src", "one-minus-src", "src-alpha", "one-minus-src-alpha", "dst", "one-minus-dst", "dst-alpha", "one-minus-dst-alpha", "src-alpha-saturated", "constant", "one-minus-constant", "src1", "one-minus-src1", "src1-alpha", "one-minus-src1-alpha" ],
@@ -5805,8 +6084,12 @@ var WebGPU = {
     20: "texture-formats-tier2",
     21: "primitive-index",
     22: "texture-component-swizzle",
+    23: "subgroup-size-control",
+    24: "texture-compression-unaligned",
+    25: "atomic-vec2u-min-max",
     327692: "chromium-experimental-unorm16-texture-formats",
-    327729: "chromium-experimental-multi-draw-indirect"
+    327729: "chromium-experimental-multi-draw-indirect",
+    327732: "chromium-experimental-subgroup-matrix"
   },
   FilterMode: [ , "nearest", "linear" ],
   FrontFace: [ , "ccw", "cw" ],
@@ -5824,6 +6107,7 @@ var WebGPU = {
   StencilOperation: [ , "keep", "zero", "replace", "invert", "increment-clamp", "decrement-clamp", "increment-wrap", "decrement-wrap" ],
   StorageTextureAccess: [ , , "write-only", "read-only", "read-write" ],
   StoreOp: [ , "store", "discard" ],
+  SubgroupMatrixComponentType: [ , "f32", "f16", "u32", "i32", "u8", "i8" ],
   SurfaceGetCurrentTextureStatus: [ , "success-optimal", "success-suboptimal", "timeout", "outdated", "lost", "error" ],
   TextureAspect: [ , "all", "stencil-only", "depth-only" ],
   TextureDimension: [ , "1d", "2d", "3d" ],
@@ -5831,9 +6115,9 @@ var WebGPU = {
   TextureSampleType: [ , , "float", "unfilterable-float", "depth", "sint", "uint" ],
   TextureViewDimension: [ , "1d", "2d", "2d-array", "cube", "cube-array", "3d" ],
   ToneMappingMode: [ , "standard", "extended" ],
-  VertexFormat: [ , "uint8", "uint8x2", "uint8x4", "sint8", "sint8x2", "sint8x4", "unorm8", "unorm8x2", "unorm8x4", "snorm8", "snorm8x2", "snorm8x4", "uint16", "uint16x2", "uint16x4", "sint16", "sint16x2", "sint16x4", "unorm16", "unorm16x2", "unorm16x4", "snorm16", "snorm16x2", "snorm16x4", "float16", "float16x2", "float16x4", "float32", "float32x2", "float32x3", "float32x4", "uint32", "uint32x2", "uint32x3", "uint32x4", "sint32", "sint32x2", "sint32x3", "sint32x4", "unorm10-10-10-2", "unorm8x4-bgra" ],
+  VertexFormat: [ , "uint8", "uint8x2", "uint8x4", "sint8", "sint8x2", "sint8x4", "unorm8", "unorm8x2", "unorm8x4", "snorm8", "snorm8x2", "snorm8x4", "uint16", "uint16x2", "uint16x4", "sint16", "sint16x2", "sint16x4", "unorm16", "unorm16x2", "unorm16x4", "snorm16", "snorm16x2", "snorm16x4", "float16", "float16x2", "float16x4", "float32", "float32x2", "float32x3", "float32x4", "uint32", "uint32x2", "uint32x3", "uint32x4", "sint32", "sint32x2", "sint32x3", "sint32x4", "unorm10-10-10-2", "unorm8x4-bgra", "snorm10-10-10-2" ],
   VertexStepMode: [ , "vertex", "instance" ],
-  WGSLLanguageFeatureName: [ , "readonly_and_readwrite_storage_textures", "packed_4x8_integer_dot_product", "unrestricted_pointer_parameters", "pointer_composite_access", "uniform_buffer_standard_layout", "subgroup_id", "texture_and_sampler_let", "subgroup_uniformity", "texture_formats_tier1", "linear_indexing" ]
+  WGSLLanguageFeatureName: [ , "readonly_and_readwrite_storage_textures", "packed_4x8_integer_dot_product", "unrestricted_pointer_parameters", "pointer_composite_access", "uniform_buffer_standard_layout", "subgroup_id", "texture_and_sampler_let", "subgroup_uniformity", "texture_formats_tier1", "linear_indexing", "immediate_address_space", "buffer_view", "swizzle_assignment", "fragment_depth" ]
 };
 
 var _emscripten_webgpu_get_device = () => {
@@ -5995,12 +6279,11 @@ var _emwgpuWaitAny = (futurePtr, futureCount, timeoutMSPtr) => {
 
 var ENV = {};
 
-var getExecutableName = () => thisProgram || "./this.program";
+var getExecutableName = () => thisProgram;
 
 var getEnvStrings = () => {
   if (!getEnvStrings.strings) {
     // Default values.
-    // Browser language detection #8751
     var lang = (globalThis.navigator?.language ?? "C").replace("-", "_") + ".UTF-8";
     var env = {
       "USER": "web_user",
@@ -6067,7 +6350,17 @@ function _fd_close(fd) {
     var ptr = HEAPU32[((iov) >> 2)];
     var len = HEAPU32[(((iov) + (4)) >> 2)];
     iov += 8;
-    var curr = FS.read(stream, HEAP8, ptr, len, offset);
+    try {
+      var curr = FS.read(stream, HEAP8, ptr, len, offset);
+    } catch (e) {
+      // On a non-blocking stream a subsequent read may would-block after we
+      // already gathered data. POSIX readv is a single gather-read: return
+      // what we have rather than failing the whole call.
+      if (ret > 0 && e instanceof FS.ErrnoError && (e.errno == 6 || e.errno == 6)) {
+        break;
+      }
+      throw e;
+    }
     if (curr < 0) return -1;
     ret += curr;
     if (curr < len) break;
@@ -6078,6 +6371,20 @@ function _fd_close(fd) {
   }
   return ret;
 };
+
+function _fd_pread(fd, iov, iovcnt, offset_low, offset_high, pnum) {
+  var offset = convertI32PairToI53Checked(offset_low, offset_high);
+  try {
+    if (isNaN(offset)) return 22;
+    var stream = SYSCALLS.getStreamFromFD(fd);
+    var num = doReadv(stream, iov, iovcnt, offset);
+    HEAPU32[((pnum) >> 2)] = num;
+    return 0;
+  } catch (e) {
+    if (typeof FS == "undefined" || !(e.name === "ErrnoError")) throw e;
+    return e.errno;
+  }
+}
 
 function _fd_read(fd, iov, iovcnt, pnum) {
   try {
@@ -6094,12 +6401,12 @@ function _fd_read(fd, iov, iovcnt, pnum) {
 function _fd_seek(fd, offset_low, offset_high, whence, newOffset) {
   var offset = convertI32PairToI53Checked(offset_low, offset_high);
   try {
-    if (isNaN(offset)) return 61;
+    if (isNaN(offset)) return 22;
     var stream = SYSCALLS.getStreamFromFD(fd);
     FS.llseek(stream, offset, whence);
     (tempI64 = [ stream.position >>> 0, (tempDouble = stream.position, (+(Math.abs(tempDouble))) >= 1 ? (tempDouble > 0 ? (+(Math.floor((tempDouble) / 4294967296))) >>> 0 : (~~((+(Math.ceil((tempDouble - +(((~~(tempDouble))) >>> 0)) / 4294967296))))) >>> 0) : 0) ], 
     HEAP32[((newOffset) >> 2)] = tempI64[0], HEAP32[(((newOffset) + (4)) >> 2)] = tempI64[1]);
-    if (stream.getdents && offset === 0 && whence === 0) stream.getdents = null;
+    if (stream.getdents && !offset && whence === 0) stream.getdents = null;
     // reset readdir state
     return 0;
   } catch (e) {
@@ -6109,23 +6416,27 @@ function _fd_seek(fd, offset_low, offset_high, whence, newOffset) {
 }
 
 /** @param {number=} offset */ var doWritev = (stream, iov, iovcnt, offset) => {
-  var ret = 0;
-  for (var i = 0; i < iovcnt; i++) {
+  // Gather all iovecs into one contiguous buffer and issue a single
+  // FS.write, matching POSIX writev's single gather-write semantics (as
+  // __syscall_sendmsg already does). Per-iovec writes fragment a stream
+  // socket send into multiple segments, breaking stream byte semantics.
+  if (iovcnt == 1) {
+    // Single iovec: write directly from HEAP8, no gather buffer needed.
+    return FS.write(stream, HEAP8, HEAPU32[((iov) >> 2)], HEAPU32[(((iov) + (4)) >> 2)], offset);
+  }
+  var total = 0;
+  for (var i = 0, p = iov; i < iovcnt; i++, p += 8) {
+    total += HEAPU32[(((p) + (4)) >> 2)];
+  }
+  var view = new Uint8Array(total);
+  var voff = 0;
+  for (var i = 0; i < iovcnt; i++, iov += 8) {
     var ptr = HEAPU32[((iov) >> 2)];
     var len = HEAPU32[(((iov) + (4)) >> 2)];
-    iov += 8;
-    var curr = FS.write(stream, HEAP8, ptr, len, offset);
-    if (curr < 0) return -1;
-    ret += curr;
-    if (curr < len) {
-      // No more space to write.
-      break;
-    }
-    if (typeof offset != "undefined") {
-      offset += curr;
-    }
+    view.set(HEAPU8.subarray(ptr, ptr + len), voff);
+    voff += len;
   }
-  return ret;
+  return FS.write(stream, view, 0, total, offset);
 };
 
 function _fd_write(fd, iov, iovcnt, pnum) {
@@ -7042,7 +7353,7 @@ var heapObjectForWebGLType = type => {
 
 var toTypedArrayIndex = (pointer, heap) => pointer >>> (31 - Math.clz32(heap.BYTES_PER_ELEMENT));
 
-var emscriptenWebGLGetTexPixelData = (type, format, width, height, pixels, internalFormat) => {
+var emscriptenWebGLGetTexPixelData = (type, format, width, height, pixels) => {
   var heap = heapObjectForWebGLType(type);
   var sizePerPixel = colorChannelsInGlTextureFormat(format) * heap.BYTES_PER_ELEMENT;
   var bytes = computeUnpackAlignedImageSize(width, height, sizePerPixel);
@@ -7060,7 +7371,7 @@ var _emscripten_glReadPixels = (x, y, width, height, format, type, pixels) => {
     GLctx.readPixels(x, y, width, height, format, type, heap, target);
     return;
   }
-  var pixelData = emscriptenWebGLGetTexPixelData(type, format, width, height, pixels, format);
+  var pixelData = emscriptenWebGLGetTexPixelData(type, format, width, height, pixels);
   if (!pixelData) {
     GL.recordError(1280);
     return;
@@ -7090,7 +7401,7 @@ var _emscripten_glTexImage2D = (target, level, internalFormat, width, height, bo
       return;
     }
   }
-  var pixelData = pixels ? emscriptenWebGLGetTexPixelData(type, format, width, height, pixels, internalFormat) : null;
+  var pixelData = pixels ? emscriptenWebGLGetTexPixelData(type, format, width, height, pixels) : null;
   GLctx.texImage2D(target, level, internalFormat, width, height, border, format, type, pixelData);
 };
 
@@ -7131,7 +7442,7 @@ var _emscripten_glTexSubImage2D = (target, level, xoffset, yoffset, width, heigh
       return;
     }
   }
-  var pixelData = pixels ? emscriptenWebGLGetTexPixelData(type, format, width, height, pixels, 0) : null;
+  var pixelData = pixels ? emscriptenWebGLGetTexPixelData(type, format, width, height, pixels) : null;
   GLctx.texSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixelData);
 };
 
@@ -7150,16 +7461,15 @@ var _emscripten_glTexSubImage3D = (target, level, xoffset, yoffset, zoffset, wid
 
 var _glTexSubImage3D = _emscripten_glTexSubImage3D;
 
-var webglGetUniformLocation = location => {
-  var p = GLctx.currentProgram;
-  if (p) {
-    var webglLoc = p.uniformLocsById[location];
-    // p.uniformLocsById[location] stores either an integer, or a
+var webglGetProgramUniformLocation = (program, location) => {
+  if (program) {
+    var webglLoc = program.uniformLocsById[location];
+    // program.uniformLocsById[location] stores either an integer, or a
     // WebGLUniformLocation.
     // If an integer, we have not yet bound the location, so do it now. The
     // integer value specifies the array index we should bind to.
     if (typeof webglLoc == "number") {
-      p.uniformLocsById[location] = webglLoc = GLctx.getUniformLocation(p, p.uniformArrayNamesById[location] + (webglLoc > 0 ? `[${webglLoc}]` : ""));
+      program.uniformLocsById[location] = webglLoc = GLctx.getUniformLocation(program, program.uniformArrayNamesById[location] + (webglLoc > 0 ? `[${webglLoc}]` : ""));
     }
     // Else an already cached WebGLUniformLocation, return it.
     return webglLoc;
@@ -7167,6 +7477,8 @@ var webglGetUniformLocation = location => {
     GL.recordError(1282);
   }
 };
+
+var webglGetUniformLocation = location => webglGetProgramUniformLocation(GLctx.currentProgram, location);
 
 var _emscripten_glUniform1f = (location, v0) => {
   GLctx.uniform1f(webglGetUniformLocation(location), v0);
@@ -7408,7 +7720,7 @@ var _emscripten_glVertexAttribPointer = (index, size, type, normalized, stride, 
     cb.stride = stride;
     cb.ptr = ptr;
     cb.clientside = true;
-    cb.vertexAttribPointerAdaptor = function(index, size, type, normalized, stride, ptr) {
+    cb.vertexAttribPointerAdaptor = /** @this {WebGLRenderingContext} */ function(index, size, type, normalized, stride, ptr) {
       this.vertexAttribPointer(index, size, type, normalized, stride, ptr);
     };
     return;
@@ -7728,7 +8040,8 @@ var _wgpuDeviceCreatePipelineLayout = (devicePtr, descriptor) => {
   }
   var desc = {
     "label": WebGPU.makeStringFromOptionalStringView(descriptor + 4),
-    "bindGroupLayouts": bgls
+    "bindGroupLayouts": bgls,
+    "immediateSize": HEAPU32[(((descriptor) + (20)) >> 2)]
   };
   var device = WebGPU.getJsObject(devicePtr);
   var ptr = _emwgpuCreatePipelineLayout(0);
@@ -7951,7 +8264,7 @@ var writeArrayToMemory = (array, buffer) => {
     for (var i = 0; i < args.length; i++) {
       var converter = toC[argTypes[i]];
       if (converter) {
-        if (stack === 0) stack = stackSave();
+        if (!stack) stack = stackSave();
         cArgs[i] = converter(args[i]);
       } else {
         cArgs[i] = args[i];
@@ -7960,7 +8273,7 @@ var writeArrayToMemory = (array, buffer) => {
   }
   var ret = func(...cArgs);
   function onDone(ret) {
-    if (stack !== 0) stackRestore(stack);
+    if (stack) stackRestore(stack);
     return convertReturnValue(ret);
   }
   ret = onDone(ret);
@@ -8007,18 +8320,19 @@ for (/**@suppress{duplicate}*/ var i = 0; i <= 288; ++i) {
 // but before the wasm module is created.
 {
   // Begin ATMODULES hooks
-  if (Module["preloadPlugins"]) preloadPlugins = Module["preloadPlugins"];
   if (Module["noExitRuntime"]) noExitRuntime = Module["noExitRuntime"];
   if (Module["print"]) out = Module["print"];
   if (Module["printErr"]) err = Module["printErr"];
-  if (Module["wasmBinary"]) wasmBinary = Module["wasmBinary"];
   // End ATMODULES hooks
-  if (Module["arguments"]) arguments_ = Module["arguments"];
+  if (Module["arguments"]) programArgs = Module["arguments"];
   if (Module["thisProgram"]) thisProgram = Module["thisProgram"];
-  if (Module["preInit"]) {
-    if (typeof Module["preInit"] == "function") Module["preInit"] = [ Module["preInit"] ];
-    while (Module["preInit"].length > 0) {
-      Module["preInit"].shift()();
+  var preInit = Module["preInit"];
+  if (preInit) {
+    if (typeof preInit == "function") Module["preInit"] = preInit = [ preInit ];
+    // Written as a loop so that preInit functions that themselves add more
+    // preInit functions.  Is this actually needed?
+    while (preInit.length > 0) {
+      preInit.shift()();
     }
   }
 }
@@ -8049,12 +8363,12 @@ Module["FS_createLazyFile"] = FS_createLazyFile;
 // End JS library exports
 // end include: postlibrary.js
 var ASM_CONSTS = {
-  1461389: $0 => {
+  1606134: $0 => {
     const canvas = Emval.toValue($0);
     const context = canvas.getContext("webgpu");
     return WebGPU.importJsTexture(context.getCurrentTexture());
   },
-  1461532: ($0, $1, $2, $3, $4) => {
+  1606277: ($0, $1, $2, $3, $4) => {
     const drawable = Emval.toValue($0);
     const device = WebGPU.getJsObject($1);
     const texture = WebGPU.getJsObject($2);
@@ -8066,7 +8380,7 @@ var ASM_CONSTS = {
       texture
     }, [ width, height ]);
   },
-  1461791: ($0, $1, $2, $3) => {
+  1606536: ($0, $1, $2, $3) => {
     const sourceExtTex = Emval.toValue($0);
     const device = WebGPU.getJsObject($1);
     const sampler = WebGPU.getJsObject($2);
@@ -8083,29 +8397,29 @@ var ASM_CONSTS = {
     });
     return WebGPU.importJsBindGroup(bindGroup);
   },
-  1462161: ($0, $1) => {
+  1606906: ($0, $1) => {
     const input = Emval.toValue($0);
     const output = Emval.toValue($1);
     const ctx = output.getContext("2d");
     ctx.drawImage(input, 0, 0, output.width, output.height);
   },
-  1462326: ($0, $1) => {
+  1607071: ($0, $1) => {
     const inputArray = Emval.toValue($0);
     const output = Emval.toValue($1);
     const ctx = output.getContext("2d");
     const image_data = new ImageData(inputArray, output.width, output.height);
     ctx.putImageData(image_data, 0, 0);
   },
-  1462550: ($0, $1) => {
+  1607295: ($0, $1) => {
     const input = Emval.toValue($0);
     const outputArray = Emval.toValue($1);
     const ctx = input.getContext("2d");
     const data = ctx.getImageData(0, 0, input.width, input.height);
     outputArray.set(data.data);
   },
-  1462754: () => (typeof HTMLCanvasElement !== "undefined"),
-  1462809: () => !!Module["preinitializedWebGPUDevice"],
-  1462860: () => {
+  1607499: () => (typeof HTMLCanvasElement !== "undefined"),
+  1607554: () => !!Module["preinitializedWebGPUDevice"],
+  1607605: () => {
     specialHTMLTargets["#canvas"] = Module.canvas;
   }
 };
@@ -8174,6 +8488,15 @@ function JsOnWebGLTextureVectorListener(output_stream_name, name, width, height,
     width,
     height
   }, false, timestamp_ms);
+}
+
+function JsWrapLoggingHelpers() {
+  if (!Module["_decodeBase64"]) {
+    Module["_decodeBase64"] = function(encoded_key_ptr) {
+      const encodedStr = UTF8ToString(encoded_key_ptr);
+      return atob(encodedStr);
+    };
+  }
 }
 
 function JsOnEmptyPacketListener(output_stream_name, timestamp) {
@@ -8323,13 +8646,6 @@ function __asyncjs__mediapipe_map_buffer_jspi(buffer_handle, data) {
   });
 }
 
-function JsWrapErrorListener(code, message) {
-  if (Module.errorListener) {
-    const stringMessage = UTF8ToString(message);
-    Module.errorListener(code, stringMessage);
-  }
-}
-
 function UseBottomLeftGpuOrigin() {
   return (Module && Module.gpuOriginForWebTexturesIsBottomLeft);
 }
@@ -8347,131 +8663,144 @@ function custom_emscripten_dbgn(str, len) {
   }
 }
 
+function JsWrapErrorListenerInternal(code, message) {
+  if (Module.errorListener) {
+    const stringMessage = UTF8ToString(message);
+    Module.errorListener(code, stringMessage);
+  }
+}
+
 // Imports from the Wasm binary.
-var _free, _malloc, _wgpuDeviceAddRef, _addBoundTextureAsImageToStream, _attachImageListener, _attachImageVectorListener, _registerModelResourcesGraphService, _bindTextureToStream, _addBoundTextureToStream, _addDoubleToInputStream, _addFloatToInputStream, _addBoolToInputStream, _addIntToInputStream, _addUintToInputStream, _addStringToInputStream, _addRawDataSpanToInputStream, _allocateBoolVector, _allocateFloatVector, _allocateDoubleVector, _allocateIntVector, _allocateUintVector, _allocateStringVector, _addBoolVectorEntry, _addFloatVectorEntry, _addDoubleVectorEntry, _addIntVectorEntry, _addUintVectorEntry, _addStringVectorEntry, _addBoolVectorToInputStream, _addFloatVectorToInputStream, _addDoubleVectorToInputStream, _addIntVectorToInputStream, _addUintVectorToInputStream, _addStringVectorToInputStream, _addFlatHashMapToInputStream, _addProtoToInputStream, _addEmptyPacketToInputStream, _addBoolToInputSidePacket, _addDoubleToInputSidePacket, _addFloatToInputSidePacket, _addIntToInputSidePacket, _addUintToInputSidePacket, _addStringToInputSidePacket, _addRawDataSpanToInputSidePacket, _addProtoToInputSidePacket, _addBoolVectorToInputSidePacket, _addDoubleVectorToInputSidePacket, _addFloatVectorToInputSidePacket, _addIntVectorToInputSidePacket, _addUintVectorToInputSidePacket, _addStringVectorToInputSidePacket, _attachBoolListener, _attachBoolVectorListener, _attachDoubleListener, _attachDoubleVectorListener, _attachFloatListener, _attachFloatVectorListener, _attachIntListener, _attachIntVectorListener, _attachUintListener, _attachUintVectorListener, _attachStringListener, _attachStringVectorListener, _attachProtoListener, _attachProtoVectorListener, _getGraphConfig, ___getTypeName, _emwgpuCreateBindGroup, _emwgpuCreateBindGroupLayout, _emwgpuCreateCommandBuffer, _emwgpuCreateCommandEncoder, _emwgpuCreateComputePassEncoder, _emwgpuCreateComputePipeline, _emwgpuCreateExternalTexture, _emwgpuCreatePipelineLayout, _emwgpuCreateQuerySet, _emwgpuCreateRenderBundle, _emwgpuCreateRenderBundleEncoder, _emwgpuCreateRenderPassEncoder, _emwgpuCreateRenderPipeline, _emwgpuCreateSampler, _emwgpuCreateSurface, _emwgpuCreateTexture, _emwgpuCreateTextureView, _emwgpuCreateAdapter, _emwgpuImportBuffer, _emwgpuCreateDevice, _emwgpuCreateQueue, _emwgpuCreateShaderModule, _emwgpuOnCreateComputePipelineCompleted, _emwgpuOnCreateRenderPipelineCompleted, _clearSubgraphs, _pushBinarySubgraph, _pushTextSubgraph, _changeBinaryGraph, _changeTextGraph, _processGl, _process, _bindTextureToCanvas, _requestShaderRefreshOnGraphChange, _waitUntilIdle, _closeGraph, _setAutoRenderToScreen, _emscripten_builtin_memalign, _memalign, __emscripten_tempret_set, __emscripten_stack_restore, __emscripten_stack_alloc, _emscripten_stack_get_current, dynCall_ji, dynCall_jii, dynCall_iiiijij, dynCall_viiji, dynCall_viji, dynCall_iiiji, dynCall_jjj, dynCall_iiiijj, dynCall_viijj, dynCall_viiijjj, dynCall_vij, dynCall_viiiji, dynCall_viijii, dynCall_vijjj, dynCall_vj, dynCall_viij, dynCall_jiji, dynCall_iiiiij, dynCall_iiiiijj, dynCall_iiiiiijj, memory, _kVersionStampBuildChangelistStr, _kVersionStampCitcSnapshotStr, _kVersionStampCitcWorkspaceIdStr, _kVersionStampSourceUriStr, _kVersionStampBuildClientStr, _kVersionStampBuildClientMintStatusStr, _kVersionStampBuildCompilerStr, _kVersionStampBuildDateTimePstStr, _kVersionStampBuildDepotPathStr, _kVersionStampBuildIdStr, _kVersionStampBuildInfoStr, _kVersionStampBuildLabelStr, _kVersionStampBuildTargetStr, _kVersionStampBuildTimestampStr, _kVersionStampBuildToolStr, _kVersionStampG3BuildTargetStr, _kVersionStampVerifiableStr, _kVersionStampBuildFdoTypeStr, _kVersionStampBuildBaselineChangelistStr, _kVersionStampBuildLtoTypeStr, _kVersionStampBuildPropellerTypeStr, _kVersionStampBuildPghoTypeStr, _kVersionStampBuildUsernameStr, _kVersionStampBuildHostnameStr, _kVersionStampBuildDirectoryStr, _kVersionStampBuildChangelistInt, _kVersionStampCitcSnapshotInt, _kVersionStampBuildClientMintStatusInt, _kVersionStampBuildTimestampInt, _kVersionStampVerifiableInt, _kVersionStampBuildCoverageEnabledInt, _kVersionStampBuildBaselineChangelistInt, _kVersionStampPrecookedTimestampStr, _kVersionStampPrecookedClientInfoStr, __indirect_function_table, wasmMemory, wasmTable;
+var _free, _malloc, _interactive_segmenter_create, _interactive_segmenter_set_image, _interactive_segmenter_segment, _interactive_segmenter_close, _wgpuDeviceAddRef, _addBoundTextureAsImageToStream, _attachImageListener, _attachImageVectorListener, _mediapipeLoggerGetEncodedApiKey, _registerModelResourcesGraphService, _bindTextureToStream, _addBoundTextureToStream, _addDoubleToInputStream, _addFloatToInputStream, _addBoolToInputStream, _addIntToInputStream, _addUintToInputStream, _addStringToInputStream, _addRawDataSpanToInputStream, _allocateBoolVector, _allocateFloatVector, _allocateDoubleVector, _allocateIntVector, _allocateUintVector, _allocateStringVector, _addBoolVectorEntry, _addFloatVectorEntry, _addDoubleVectorEntry, _addIntVectorEntry, _addUintVectorEntry, _addStringVectorEntry, _addBoolVectorToInputStream, _addFloatVectorToInputStream, _addDoubleVectorToInputStream, _addIntVectorToInputStream, _addUintVectorToInputStream, _addStringVectorToInputStream, _addFlatHashMapToInputStream, _addProtoToInputStream, _addEmptyPacketToInputStream, _addBoolToInputSidePacket, _addDoubleToInputSidePacket, _addFloatToInputSidePacket, _addIntToInputSidePacket, _addUintToInputSidePacket, _addStringToInputSidePacket, _addRawDataSpanToInputSidePacket, _addProtoToInputSidePacket, _addBoolVectorToInputSidePacket, _addDoubleVectorToInputSidePacket, _addFloatVectorToInputSidePacket, _addIntVectorToInputSidePacket, _addUintVectorToInputSidePacket, _addStringVectorToInputSidePacket, _attachBoolListener, _attachBoolVectorListener, _attachDoubleListener, _attachDoubleVectorListener, _attachFloatListener, _attachFloatVectorListener, _attachIntListener, _attachIntVectorListener, _attachUintListener, _attachUintVectorListener, _attachStringListener, _attachStringVectorListener, _attachProtoListener, _attachProtoVectorListener, _getGraphConfig, ___getTypeName, _emwgpuCreateBindGroup, _emwgpuCreateBindGroupLayout, _emwgpuCreateCommandBuffer, _emwgpuCreateCommandEncoder, _emwgpuCreateComputePassEncoder, _emwgpuCreateComputePipeline, _emwgpuCreateExternalTexture, _emwgpuCreatePipelineLayout, _emwgpuCreateQuerySet, _emwgpuCreateRenderBundle, _emwgpuCreateRenderBundleEncoder, _emwgpuCreateRenderPassEncoder, _emwgpuCreateRenderPipeline, _emwgpuCreateSampler, _emwgpuCreateSurface, _emwgpuCreateTexture, _emwgpuCreateTextureView, _emwgpuCreateAdapter, _emwgpuImportBuffer, _emwgpuCreateDevice, _emwgpuCreateQueue, _emwgpuCreateShaderModule, _emwgpuOnCreateComputePipelineCompleted, _emwgpuOnCreateRenderPipelineCompleted, _clearSubgraphs, _pushBinarySubgraph, _pushTextSubgraph, _changeBinaryGraph, _changeTextGraph, _processGl, _process, _bindTextureToCanvas, _requestShaderRefreshOnGraphChange, _waitUntilIdle, _closeGraph, _setAutoRenderToScreen, _emscripten_builtin_memalign, _memalign, __emscripten_tempret_set, __emscripten_stack_restore, __emscripten_stack_alloc, _emscripten_stack_get_current, dynCall_ji, dynCall_jii, dynCall_iiiijij, dynCall_iij, dynCall_iiiijj, dynCall_viijj, dynCall_viiijjj, dynCall_vij, dynCall_viiji, dynCall_viji, dynCall_iiiji, dynCall_jjj, dynCall_jiii, dynCall_viijii, dynCall_vijjj, dynCall_vj, dynCall_viij, dynCall_jiji, dynCall_iiiiij, dynCall_iiiiijj, dynCall_iiiiiijj, memory, _kVersionStampBuildChangelistStr, _kVersionStampCitcSnapshotStr, _kVersionStampCitcWorkspaceIdStr, _kVersionStampSourceUriStr, _kVersionStampBuildClientStr, _kVersionStampBuildClientMintStatusStr, _kVersionStampBuildCompilerStr, _kVersionStampBuildDateTimePstStr, _kVersionStampBuildDepotPathStr, _kVersionStampBuildIdStr, _kVersionStampBuildInfoStr, _kVersionStampBuildLabelStr, _kVersionStampBuildTargetStr, _kVersionStampBuildTimestampStr, _kVersionStampBuildToolStr, _kVersionStampG3BuildTargetStr, _kVersionStampVerifiableStr, _kVersionStampBuildFdoTypeStr, _kVersionStampBuildBaselineChangelistStr, _kVersionStampBuildLtoTypeStr, _kVersionStampBuildPropellerTypeStr, _kVersionStampBuildPghoTypeStr, _kVersionStampBuildFdoProfileChangelistStr, _kVersionStampBuildMemprofProfileChangelistStr, _kVersionStampBuildUsernameStr, _kVersionStampBuildHostnameStr, _kVersionStampBuildDirectoryStr, _kVersionStampBuildChangelistInt, _kVersionStampCitcSnapshotInt, _kVersionStampBuildClientMintStatusInt, _kVersionStampBuildTimestampInt, _kVersionStampVerifiableInt, _kVersionStampBuildCoverageEnabledInt, _kVersionStampBuildBaselineChangelistInt, _kVersionStampPrecookedTimestampStr, _kVersionStampPrecookedClientInfoStr, __indirect_function_table, _kVersionStampBuildHasHardeningProtobuf, wasmMemory, wasmTable;
 
 function assignWasmExports(wasmExports) {
-  _free = Module["_free"] = wasmExports["Sd"];
-  _malloc = Module["_malloc"] = wasmExports["Td"];
-  _wgpuDeviceAddRef = wasmExports["Ud"];
-  _addBoundTextureAsImageToStream = Module["_addBoundTextureAsImageToStream"] = wasmExports["Vd"];
-  _attachImageListener = Module["_attachImageListener"] = wasmExports["Wd"];
-  _attachImageVectorListener = Module["_attachImageVectorListener"] = wasmExports["Xd"];
-  _registerModelResourcesGraphService = Module["_registerModelResourcesGraphService"] = wasmExports["Yd"];
-  _bindTextureToStream = Module["_bindTextureToStream"] = wasmExports["Zd"];
-  _addBoundTextureToStream = Module["_addBoundTextureToStream"] = wasmExports["_d"];
-  _addDoubleToInputStream = Module["_addDoubleToInputStream"] = wasmExports["$d"];
-  _addFloatToInputStream = Module["_addFloatToInputStream"] = wasmExports["ae"];
-  _addBoolToInputStream = Module["_addBoolToInputStream"] = wasmExports["be"];
-  _addIntToInputStream = Module["_addIntToInputStream"] = wasmExports["ce"];
-  _addUintToInputStream = Module["_addUintToInputStream"] = wasmExports["de"];
-  _addStringToInputStream = Module["_addStringToInputStream"] = wasmExports["ee"];
-  _addRawDataSpanToInputStream = Module["_addRawDataSpanToInputStream"] = wasmExports["fe"];
-  _allocateBoolVector = Module["_allocateBoolVector"] = wasmExports["ge"];
-  _allocateFloatVector = Module["_allocateFloatVector"] = wasmExports["he"];
-  _allocateDoubleVector = Module["_allocateDoubleVector"] = wasmExports["ie"];
-  _allocateIntVector = Module["_allocateIntVector"] = wasmExports["je"];
-  _allocateUintVector = Module["_allocateUintVector"] = wasmExports["ke"];
-  _allocateStringVector = Module["_allocateStringVector"] = wasmExports["le"];
-  _addBoolVectorEntry = Module["_addBoolVectorEntry"] = wasmExports["me"];
-  _addFloatVectorEntry = Module["_addFloatVectorEntry"] = wasmExports["ne"];
-  _addDoubleVectorEntry = Module["_addDoubleVectorEntry"] = wasmExports["oe"];
-  _addIntVectorEntry = Module["_addIntVectorEntry"] = wasmExports["pe"];
-  _addUintVectorEntry = Module["_addUintVectorEntry"] = wasmExports["qe"];
-  _addStringVectorEntry = Module["_addStringVectorEntry"] = wasmExports["re"];
-  _addBoolVectorToInputStream = Module["_addBoolVectorToInputStream"] = wasmExports["se"];
-  _addFloatVectorToInputStream = Module["_addFloatVectorToInputStream"] = wasmExports["te"];
-  _addDoubleVectorToInputStream = Module["_addDoubleVectorToInputStream"] = wasmExports["ue"];
-  _addIntVectorToInputStream = Module["_addIntVectorToInputStream"] = wasmExports["ve"];
-  _addUintVectorToInputStream = Module["_addUintVectorToInputStream"] = wasmExports["we"];
-  _addStringVectorToInputStream = Module["_addStringVectorToInputStream"] = wasmExports["xe"];
-  _addFlatHashMapToInputStream = Module["_addFlatHashMapToInputStream"] = wasmExports["ye"];
-  _addProtoToInputStream = Module["_addProtoToInputStream"] = wasmExports["ze"];
-  _addEmptyPacketToInputStream = Module["_addEmptyPacketToInputStream"] = wasmExports["Ae"];
-  _addBoolToInputSidePacket = Module["_addBoolToInputSidePacket"] = wasmExports["Be"];
-  _addDoubleToInputSidePacket = Module["_addDoubleToInputSidePacket"] = wasmExports["Ce"];
-  _addFloatToInputSidePacket = Module["_addFloatToInputSidePacket"] = wasmExports["De"];
-  _addIntToInputSidePacket = Module["_addIntToInputSidePacket"] = wasmExports["Ee"];
-  _addUintToInputSidePacket = Module["_addUintToInputSidePacket"] = wasmExports["Fe"];
-  _addStringToInputSidePacket = Module["_addStringToInputSidePacket"] = wasmExports["Ge"];
-  _addRawDataSpanToInputSidePacket = Module["_addRawDataSpanToInputSidePacket"] = wasmExports["He"];
-  _addProtoToInputSidePacket = Module["_addProtoToInputSidePacket"] = wasmExports["Ie"];
-  _addBoolVectorToInputSidePacket = Module["_addBoolVectorToInputSidePacket"] = wasmExports["Je"];
-  _addDoubleVectorToInputSidePacket = Module["_addDoubleVectorToInputSidePacket"] = wasmExports["Ke"];
-  _addFloatVectorToInputSidePacket = Module["_addFloatVectorToInputSidePacket"] = wasmExports["Le"];
-  _addIntVectorToInputSidePacket = Module["_addIntVectorToInputSidePacket"] = wasmExports["Me"];
-  _addUintVectorToInputSidePacket = Module["_addUintVectorToInputSidePacket"] = wasmExports["Ne"];
-  _addStringVectorToInputSidePacket = Module["_addStringVectorToInputSidePacket"] = wasmExports["Oe"];
-  _attachBoolListener = Module["_attachBoolListener"] = wasmExports["Pe"];
-  _attachBoolVectorListener = Module["_attachBoolVectorListener"] = wasmExports["Qe"];
-  _attachDoubleListener = Module["_attachDoubleListener"] = wasmExports["Re"];
-  _attachDoubleVectorListener = Module["_attachDoubleVectorListener"] = wasmExports["Se"];
-  _attachFloatListener = Module["_attachFloatListener"] = wasmExports["Te"];
-  _attachFloatVectorListener = Module["_attachFloatVectorListener"] = wasmExports["Ue"];
-  _attachIntListener = Module["_attachIntListener"] = wasmExports["Ve"];
-  _attachIntVectorListener = Module["_attachIntVectorListener"] = wasmExports["We"];
-  _attachUintListener = Module["_attachUintListener"] = wasmExports["Xe"];
-  _attachUintVectorListener = Module["_attachUintVectorListener"] = wasmExports["Ye"];
-  _attachStringListener = Module["_attachStringListener"] = wasmExports["Ze"];
-  _attachStringVectorListener = Module["_attachStringVectorListener"] = wasmExports["_e"];
-  _attachProtoListener = Module["_attachProtoListener"] = wasmExports["$e"];
-  _attachProtoVectorListener = Module["_attachProtoVectorListener"] = wasmExports["af"];
-  _getGraphConfig = Module["_getGraphConfig"] = wasmExports["bf"];
-  ___getTypeName = wasmExports["cf"];
-  _emwgpuCreateBindGroup = wasmExports["df"];
-  _emwgpuCreateBindGroupLayout = wasmExports["ef"];
-  _emwgpuCreateCommandBuffer = wasmExports["ff"];
-  _emwgpuCreateCommandEncoder = wasmExports["gf"];
-  _emwgpuCreateComputePassEncoder = wasmExports["hf"];
-  _emwgpuCreateComputePipeline = wasmExports["jf"];
-  _emwgpuCreateExternalTexture = wasmExports["kf"];
-  _emwgpuCreatePipelineLayout = wasmExports["lf"];
-  _emwgpuCreateQuerySet = wasmExports["mf"];
-  _emwgpuCreateRenderBundle = wasmExports["nf"];
-  _emwgpuCreateRenderBundleEncoder = wasmExports["of"];
-  _emwgpuCreateRenderPassEncoder = wasmExports["pf"];
-  _emwgpuCreateRenderPipeline = wasmExports["qf"];
-  _emwgpuCreateSampler = wasmExports["rf"];
-  _emwgpuCreateSurface = wasmExports["sf"];
-  _emwgpuCreateTexture = wasmExports["tf"];
-  _emwgpuCreateTextureView = wasmExports["uf"];
-  _emwgpuCreateAdapter = wasmExports["vf"];
-  _emwgpuImportBuffer = wasmExports["wf"];
-  _emwgpuCreateDevice = wasmExports["xf"];
-  _emwgpuCreateQueue = wasmExports["yf"];
-  _emwgpuCreateShaderModule = wasmExports["zf"];
-  _emwgpuOnCreateComputePipelineCompleted = wasmExports["Af"];
-  _emwgpuOnCreateRenderPipelineCompleted = wasmExports["Bf"];
-  _clearSubgraphs = Module["_clearSubgraphs"] = wasmExports["Cf"];
-  _pushBinarySubgraph = Module["_pushBinarySubgraph"] = wasmExports["Df"];
-  _pushTextSubgraph = Module["_pushTextSubgraph"] = wasmExports["Ef"];
-  _changeBinaryGraph = Module["_changeBinaryGraph"] = wasmExports["Ff"];
-  _changeTextGraph = Module["_changeTextGraph"] = wasmExports["Gf"];
-  _processGl = Module["_processGl"] = wasmExports["Hf"];
-  _process = Module["_process"] = wasmExports["If"];
-  _bindTextureToCanvas = Module["_bindTextureToCanvas"] = wasmExports["Jf"];
-  _requestShaderRefreshOnGraphChange = Module["_requestShaderRefreshOnGraphChange"] = wasmExports["Kf"];
-  _waitUntilIdle = Module["_waitUntilIdle"] = wasmExports["Lf"];
-  _closeGraph = Module["_closeGraph"] = wasmExports["Mf"];
-  _setAutoRenderToScreen = Module["_setAutoRenderToScreen"] = wasmExports["Nf"];
-  _emscripten_builtin_memalign = wasmExports["Of"];
-  _memalign = wasmExports["Pf"];
-  __emscripten_tempret_set = wasmExports["Qf"];
-  __emscripten_stack_restore = wasmExports["Rf"];
-  __emscripten_stack_alloc = wasmExports["Sf"];
-  _emscripten_stack_get_current = wasmExports["Tf"];
+  _free = Module["_free"] = wasmExports["ce"];
+  _malloc = Module["_malloc"] = wasmExports["de"];
+  _interactive_segmenter_create = Module["_interactive_segmenter_create"] = wasmExports["ee"];
+  _interactive_segmenter_set_image = Module["_interactive_segmenter_set_image"] = wasmExports["fe"];
+  _interactive_segmenter_segment = Module["_interactive_segmenter_segment"] = wasmExports["ge"];
+  _interactive_segmenter_close = Module["_interactive_segmenter_close"] = wasmExports["he"];
+  _wgpuDeviceAddRef = wasmExports["ie"];
+  _addBoundTextureAsImageToStream = Module["_addBoundTextureAsImageToStream"] = wasmExports["je"];
+  _attachImageListener = Module["_attachImageListener"] = wasmExports["ke"];
+  _attachImageVectorListener = Module["_attachImageVectorListener"] = wasmExports["le"];
+  _mediapipeLoggerGetEncodedApiKey = Module["_mediapipeLoggerGetEncodedApiKey"] = wasmExports["me"];
+  _registerModelResourcesGraphService = Module["_registerModelResourcesGraphService"] = wasmExports["ne"];
+  _bindTextureToStream = Module["_bindTextureToStream"] = wasmExports["oe"];
+  _addBoundTextureToStream = Module["_addBoundTextureToStream"] = wasmExports["pe"];
+  _addDoubleToInputStream = Module["_addDoubleToInputStream"] = wasmExports["qe"];
+  _addFloatToInputStream = Module["_addFloatToInputStream"] = wasmExports["re"];
+  _addBoolToInputStream = Module["_addBoolToInputStream"] = wasmExports["se"];
+  _addIntToInputStream = Module["_addIntToInputStream"] = wasmExports["te"];
+  _addUintToInputStream = Module["_addUintToInputStream"] = wasmExports["ue"];
+  _addStringToInputStream = Module["_addStringToInputStream"] = wasmExports["ve"];
+  _addRawDataSpanToInputStream = Module["_addRawDataSpanToInputStream"] = wasmExports["we"];
+  _allocateBoolVector = Module["_allocateBoolVector"] = wasmExports["xe"];
+  _allocateFloatVector = Module["_allocateFloatVector"] = wasmExports["ye"];
+  _allocateDoubleVector = Module["_allocateDoubleVector"] = wasmExports["ze"];
+  _allocateIntVector = Module["_allocateIntVector"] = wasmExports["Ae"];
+  _allocateUintVector = Module["_allocateUintVector"] = wasmExports["Be"];
+  _allocateStringVector = Module["_allocateStringVector"] = wasmExports["Ce"];
+  _addBoolVectorEntry = Module["_addBoolVectorEntry"] = wasmExports["De"];
+  _addFloatVectorEntry = Module["_addFloatVectorEntry"] = wasmExports["Ee"];
+  _addDoubleVectorEntry = Module["_addDoubleVectorEntry"] = wasmExports["Fe"];
+  _addIntVectorEntry = Module["_addIntVectorEntry"] = wasmExports["Ge"];
+  _addUintVectorEntry = Module["_addUintVectorEntry"] = wasmExports["He"];
+  _addStringVectorEntry = Module["_addStringVectorEntry"] = wasmExports["Ie"];
+  _addBoolVectorToInputStream = Module["_addBoolVectorToInputStream"] = wasmExports["Je"];
+  _addFloatVectorToInputStream = Module["_addFloatVectorToInputStream"] = wasmExports["Ke"];
+  _addDoubleVectorToInputStream = Module["_addDoubleVectorToInputStream"] = wasmExports["Le"];
+  _addIntVectorToInputStream = Module["_addIntVectorToInputStream"] = wasmExports["Me"];
+  _addUintVectorToInputStream = Module["_addUintVectorToInputStream"] = wasmExports["Ne"];
+  _addStringVectorToInputStream = Module["_addStringVectorToInputStream"] = wasmExports["Oe"];
+  _addFlatHashMapToInputStream = Module["_addFlatHashMapToInputStream"] = wasmExports["Pe"];
+  _addProtoToInputStream = Module["_addProtoToInputStream"] = wasmExports["Qe"];
+  _addEmptyPacketToInputStream = Module["_addEmptyPacketToInputStream"] = wasmExports["Re"];
+  _addBoolToInputSidePacket = Module["_addBoolToInputSidePacket"] = wasmExports["Se"];
+  _addDoubleToInputSidePacket = Module["_addDoubleToInputSidePacket"] = wasmExports["Te"];
+  _addFloatToInputSidePacket = Module["_addFloatToInputSidePacket"] = wasmExports["Ue"];
+  _addIntToInputSidePacket = Module["_addIntToInputSidePacket"] = wasmExports["Ve"];
+  _addUintToInputSidePacket = Module["_addUintToInputSidePacket"] = wasmExports["We"];
+  _addStringToInputSidePacket = Module["_addStringToInputSidePacket"] = wasmExports["Xe"];
+  _addRawDataSpanToInputSidePacket = Module["_addRawDataSpanToInputSidePacket"] = wasmExports["Ye"];
+  _addProtoToInputSidePacket = Module["_addProtoToInputSidePacket"] = wasmExports["Ze"];
+  _addBoolVectorToInputSidePacket = Module["_addBoolVectorToInputSidePacket"] = wasmExports["_e"];
+  _addDoubleVectorToInputSidePacket = Module["_addDoubleVectorToInputSidePacket"] = wasmExports["$e"];
+  _addFloatVectorToInputSidePacket = Module["_addFloatVectorToInputSidePacket"] = wasmExports["af"];
+  _addIntVectorToInputSidePacket = Module["_addIntVectorToInputSidePacket"] = wasmExports["bf"];
+  _addUintVectorToInputSidePacket = Module["_addUintVectorToInputSidePacket"] = wasmExports["cf"];
+  _addStringVectorToInputSidePacket = Module["_addStringVectorToInputSidePacket"] = wasmExports["df"];
+  _attachBoolListener = Module["_attachBoolListener"] = wasmExports["ef"];
+  _attachBoolVectorListener = Module["_attachBoolVectorListener"] = wasmExports["ff"];
+  _attachDoubleListener = Module["_attachDoubleListener"] = wasmExports["gf"];
+  _attachDoubleVectorListener = Module["_attachDoubleVectorListener"] = wasmExports["hf"];
+  _attachFloatListener = Module["_attachFloatListener"] = wasmExports["jf"];
+  _attachFloatVectorListener = Module["_attachFloatVectorListener"] = wasmExports["kf"];
+  _attachIntListener = Module["_attachIntListener"] = wasmExports["lf"];
+  _attachIntVectorListener = Module["_attachIntVectorListener"] = wasmExports["mf"];
+  _attachUintListener = Module["_attachUintListener"] = wasmExports["nf"];
+  _attachUintVectorListener = Module["_attachUintVectorListener"] = wasmExports["of"];
+  _attachStringListener = Module["_attachStringListener"] = wasmExports["pf"];
+  _attachStringVectorListener = Module["_attachStringVectorListener"] = wasmExports["qf"];
+  _attachProtoListener = Module["_attachProtoListener"] = wasmExports["rf"];
+  _attachProtoVectorListener = Module["_attachProtoVectorListener"] = wasmExports["sf"];
+  _getGraphConfig = Module["_getGraphConfig"] = wasmExports["tf"];
+  ___getTypeName = wasmExports["uf"];
+  _emwgpuCreateBindGroup = wasmExports["vf"];
+  _emwgpuCreateBindGroupLayout = wasmExports["wf"];
+  _emwgpuCreateCommandBuffer = wasmExports["xf"];
+  _emwgpuCreateCommandEncoder = wasmExports["yf"];
+  _emwgpuCreateComputePassEncoder = wasmExports["zf"];
+  _emwgpuCreateComputePipeline = wasmExports["Af"];
+  _emwgpuCreateExternalTexture = wasmExports["Bf"];
+  _emwgpuCreatePipelineLayout = wasmExports["Cf"];
+  _emwgpuCreateQuerySet = wasmExports["Df"];
+  _emwgpuCreateRenderBundle = wasmExports["Ef"];
+  _emwgpuCreateRenderBundleEncoder = wasmExports["Ff"];
+  _emwgpuCreateRenderPassEncoder = wasmExports["Gf"];
+  _emwgpuCreateRenderPipeline = wasmExports["Hf"];
+  _emwgpuCreateSampler = wasmExports["If"];
+  _emwgpuCreateSurface = wasmExports["Jf"];
+  _emwgpuCreateTexture = wasmExports["Kf"];
+  _emwgpuCreateTextureView = wasmExports["Lf"];
+  _emwgpuCreateAdapter = wasmExports["Mf"];
+  _emwgpuImportBuffer = wasmExports["Nf"];
+  _emwgpuCreateDevice = wasmExports["Of"];
+  _emwgpuCreateQueue = wasmExports["Pf"];
+  _emwgpuCreateShaderModule = wasmExports["Qf"];
+  _emwgpuOnCreateComputePipelineCompleted = wasmExports["Rf"];
+  _emwgpuOnCreateRenderPipelineCompleted = wasmExports["Sf"];
+  _clearSubgraphs = Module["_clearSubgraphs"] = wasmExports["Tf"];
+  _pushBinarySubgraph = Module["_pushBinarySubgraph"] = wasmExports["Uf"];
+  _pushTextSubgraph = Module["_pushTextSubgraph"] = wasmExports["Vf"];
+  _changeBinaryGraph = Module["_changeBinaryGraph"] = wasmExports["Wf"];
+  _changeTextGraph = Module["_changeTextGraph"] = wasmExports["Xf"];
+  _processGl = Module["_processGl"] = wasmExports["Yf"];
+  _process = Module["_process"] = wasmExports["Zf"];
+  _bindTextureToCanvas = Module["_bindTextureToCanvas"] = wasmExports["_f"];
+  _requestShaderRefreshOnGraphChange = Module["_requestShaderRefreshOnGraphChange"] = wasmExports["$f"];
+  _waitUntilIdle = Module["_waitUntilIdle"] = wasmExports["ag"];
+  _closeGraph = Module["_closeGraph"] = wasmExports["bg"];
+  _setAutoRenderToScreen = Module["_setAutoRenderToScreen"] = wasmExports["cg"];
+  _emscripten_builtin_memalign = wasmExports["eg"];
+  _memalign = wasmExports["fg"];
+  __emscripten_tempret_set = wasmExports["gg"];
+  __emscripten_stack_restore = wasmExports["hg"];
+  __emscripten_stack_alloc = wasmExports["ig"];
+  _emscripten_stack_get_current = wasmExports["jg"];
   dynCall_ji = wasmExports["dynCall_ji"];
   dynCall_jii = wasmExports["dynCall_jii"];
   dynCall_iiiijij = wasmExports["dynCall_iiiijij"];
-  dynCall_viiji = wasmExports["dynCall_viiji"];
-  dynCall_viji = wasmExports["dynCall_viji"];
-  dynCall_iiiji = wasmExports["dynCall_iiiji"];
-  dynCall_jjj = wasmExports["dynCall_jjj"];
+  dynCall_iij = wasmExports["dynCall_iij"];
   dynCall_iiiijj = wasmExports["dynCall_iiiijj"];
   dynCall_viijj = wasmExports["dynCall_viijj"];
   dynCall_viiijjj = wasmExports["dynCall_viiijjj"];
   dynCall_vij = wasmExports["dynCall_vij"];
-  dynCall_viiiji = wasmExports["dynCall_viiiji"];
+  dynCall_viiji = wasmExports["dynCall_viiji"];
+  dynCall_viji = wasmExports["dynCall_viji"];
+  dynCall_iiiji = wasmExports["dynCall_iiiji"];
+  dynCall_jjj = wasmExports["dynCall_jjj"];
+  dynCall_jiii = wasmExports["dynCall_jiii"];
   dynCall_viijii = wasmExports["dynCall_viijii"];
   dynCall_vijjj = wasmExports["dynCall_vijjj"];
   dynCall_vj = wasmExports["dynCall_vj"];
@@ -8480,330 +8809,314 @@ function assignWasmExports(wasmExports) {
   dynCall_iiiiij = wasmExports["dynCall_iiiiij"];
   dynCall_iiiiijj = wasmExports["dynCall_iiiiijj"];
   dynCall_iiiiiijj = wasmExports["dynCall_iiiiiijj"];
-  memory = wasmMemory = wasmExports["hd"];
-  _kVersionStampBuildChangelistStr = Module["_kVersionStampBuildChangelistStr"] = wasmExports["jd"].value;
-  _kVersionStampCitcSnapshotStr = Module["_kVersionStampCitcSnapshotStr"] = wasmExports["kd"].value;
-  _kVersionStampCitcWorkspaceIdStr = Module["_kVersionStampCitcWorkspaceIdStr"] = wasmExports["ld"].value;
-  _kVersionStampSourceUriStr = Module["_kVersionStampSourceUriStr"] = wasmExports["md"].value;
-  _kVersionStampBuildClientStr = Module["_kVersionStampBuildClientStr"] = wasmExports["nd"].value;
-  _kVersionStampBuildClientMintStatusStr = Module["_kVersionStampBuildClientMintStatusStr"] = wasmExports["od"].value;
-  _kVersionStampBuildCompilerStr = Module["_kVersionStampBuildCompilerStr"] = wasmExports["pd"].value;
-  _kVersionStampBuildDateTimePstStr = Module["_kVersionStampBuildDateTimePstStr"] = wasmExports["qd"].value;
-  _kVersionStampBuildDepotPathStr = Module["_kVersionStampBuildDepotPathStr"] = wasmExports["rd"].value;
-  _kVersionStampBuildIdStr = Module["_kVersionStampBuildIdStr"] = wasmExports["sd"].value;
-  _kVersionStampBuildInfoStr = Module["_kVersionStampBuildInfoStr"] = wasmExports["td"].value;
-  _kVersionStampBuildLabelStr = Module["_kVersionStampBuildLabelStr"] = wasmExports["ud"].value;
-  _kVersionStampBuildTargetStr = Module["_kVersionStampBuildTargetStr"] = wasmExports["vd"].value;
-  _kVersionStampBuildTimestampStr = Module["_kVersionStampBuildTimestampStr"] = wasmExports["wd"].value;
-  _kVersionStampBuildToolStr = Module["_kVersionStampBuildToolStr"] = wasmExports["xd"].value;
-  _kVersionStampG3BuildTargetStr = Module["_kVersionStampG3BuildTargetStr"] = wasmExports["yd"].value;
-  _kVersionStampVerifiableStr = Module["_kVersionStampVerifiableStr"] = wasmExports["zd"].value;
-  _kVersionStampBuildFdoTypeStr = Module["_kVersionStampBuildFdoTypeStr"] = wasmExports["Ad"].value;
-  _kVersionStampBuildBaselineChangelistStr = Module["_kVersionStampBuildBaselineChangelistStr"] = wasmExports["Bd"].value;
-  _kVersionStampBuildLtoTypeStr = Module["_kVersionStampBuildLtoTypeStr"] = wasmExports["Cd"].value;
-  _kVersionStampBuildPropellerTypeStr = Module["_kVersionStampBuildPropellerTypeStr"] = wasmExports["Dd"].value;
-  _kVersionStampBuildPghoTypeStr = Module["_kVersionStampBuildPghoTypeStr"] = wasmExports["Ed"].value;
-  _kVersionStampBuildUsernameStr = Module["_kVersionStampBuildUsernameStr"] = wasmExports["Fd"].value;
-  _kVersionStampBuildHostnameStr = Module["_kVersionStampBuildHostnameStr"] = wasmExports["Gd"].value;
-  _kVersionStampBuildDirectoryStr = Module["_kVersionStampBuildDirectoryStr"] = wasmExports["Hd"].value;
-  _kVersionStampBuildChangelistInt = Module["_kVersionStampBuildChangelistInt"] = wasmExports["Id"].value;
-  _kVersionStampCitcSnapshotInt = Module["_kVersionStampCitcSnapshotInt"] = wasmExports["Jd"].value;
-  _kVersionStampBuildClientMintStatusInt = Module["_kVersionStampBuildClientMintStatusInt"] = wasmExports["Kd"].value;
-  _kVersionStampBuildTimestampInt = Module["_kVersionStampBuildTimestampInt"] = wasmExports["Ld"].value;
-  _kVersionStampVerifiableInt = Module["_kVersionStampVerifiableInt"] = wasmExports["Md"].value;
-  _kVersionStampBuildCoverageEnabledInt = Module["_kVersionStampBuildCoverageEnabledInt"] = wasmExports["Nd"].value;
-  _kVersionStampBuildBaselineChangelistInt = Module["_kVersionStampBuildBaselineChangelistInt"] = wasmExports["Od"].value;
-  _kVersionStampPrecookedTimestampStr = Module["_kVersionStampPrecookedTimestampStr"] = wasmExports["Pd"].value;
-  _kVersionStampPrecookedClientInfoStr = Module["_kVersionStampPrecookedClientInfoStr"] = wasmExports["Qd"].value;
-  __indirect_function_table = wasmTable = wasmExports["Rd"];
+  memory = wasmMemory = wasmExports["rd"];
+  _kVersionStampBuildChangelistStr = Module["_kVersionStampBuildChangelistStr"] = wasmExports["td"].value;
+  _kVersionStampCitcSnapshotStr = Module["_kVersionStampCitcSnapshotStr"] = wasmExports["ud"].value;
+  _kVersionStampCitcWorkspaceIdStr = Module["_kVersionStampCitcWorkspaceIdStr"] = wasmExports["vd"].value;
+  _kVersionStampSourceUriStr = Module["_kVersionStampSourceUriStr"] = wasmExports["wd"].value;
+  _kVersionStampBuildClientStr = Module["_kVersionStampBuildClientStr"] = wasmExports["xd"].value;
+  _kVersionStampBuildClientMintStatusStr = Module["_kVersionStampBuildClientMintStatusStr"] = wasmExports["yd"].value;
+  _kVersionStampBuildCompilerStr = Module["_kVersionStampBuildCompilerStr"] = wasmExports["zd"].value;
+  _kVersionStampBuildDateTimePstStr = Module["_kVersionStampBuildDateTimePstStr"] = wasmExports["Ad"].value;
+  _kVersionStampBuildDepotPathStr = Module["_kVersionStampBuildDepotPathStr"] = wasmExports["Bd"].value;
+  _kVersionStampBuildIdStr = Module["_kVersionStampBuildIdStr"] = wasmExports["Cd"].value;
+  _kVersionStampBuildInfoStr = Module["_kVersionStampBuildInfoStr"] = wasmExports["Dd"].value;
+  _kVersionStampBuildLabelStr = Module["_kVersionStampBuildLabelStr"] = wasmExports["Ed"].value;
+  _kVersionStampBuildTargetStr = Module["_kVersionStampBuildTargetStr"] = wasmExports["Fd"].value;
+  _kVersionStampBuildTimestampStr = Module["_kVersionStampBuildTimestampStr"] = wasmExports["Gd"].value;
+  _kVersionStampBuildToolStr = Module["_kVersionStampBuildToolStr"] = wasmExports["Hd"].value;
+  _kVersionStampG3BuildTargetStr = Module["_kVersionStampG3BuildTargetStr"] = wasmExports["Id"].value;
+  _kVersionStampVerifiableStr = Module["_kVersionStampVerifiableStr"] = wasmExports["Jd"].value;
+  _kVersionStampBuildFdoTypeStr = Module["_kVersionStampBuildFdoTypeStr"] = wasmExports["Kd"].value;
+  _kVersionStampBuildBaselineChangelistStr = Module["_kVersionStampBuildBaselineChangelistStr"] = wasmExports["Ld"].value;
+  _kVersionStampBuildLtoTypeStr = Module["_kVersionStampBuildLtoTypeStr"] = wasmExports["Md"].value;
+  _kVersionStampBuildPropellerTypeStr = Module["_kVersionStampBuildPropellerTypeStr"] = wasmExports["Nd"].value;
+  _kVersionStampBuildPghoTypeStr = Module["_kVersionStampBuildPghoTypeStr"] = wasmExports["Od"].value;
+  _kVersionStampBuildFdoProfileChangelistStr = Module["_kVersionStampBuildFdoProfileChangelistStr"] = wasmExports["Pd"].value;
+  _kVersionStampBuildMemprofProfileChangelistStr = Module["_kVersionStampBuildMemprofProfileChangelistStr"] = wasmExports["Qd"].value;
+  _kVersionStampBuildUsernameStr = Module["_kVersionStampBuildUsernameStr"] = wasmExports["Rd"].value;
+  _kVersionStampBuildHostnameStr = Module["_kVersionStampBuildHostnameStr"] = wasmExports["Sd"].value;
+  _kVersionStampBuildDirectoryStr = Module["_kVersionStampBuildDirectoryStr"] = wasmExports["Td"].value;
+  _kVersionStampBuildChangelistInt = Module["_kVersionStampBuildChangelistInt"] = wasmExports["Ud"].value;
+  _kVersionStampCitcSnapshotInt = Module["_kVersionStampCitcSnapshotInt"] = wasmExports["Vd"].value;
+  _kVersionStampBuildClientMintStatusInt = Module["_kVersionStampBuildClientMintStatusInt"] = wasmExports["Wd"].value;
+  _kVersionStampBuildTimestampInt = Module["_kVersionStampBuildTimestampInt"] = wasmExports["Xd"].value;
+  _kVersionStampVerifiableInt = Module["_kVersionStampVerifiableInt"] = wasmExports["Yd"].value;
+  _kVersionStampBuildCoverageEnabledInt = Module["_kVersionStampBuildCoverageEnabledInt"] = wasmExports["Zd"].value;
+  _kVersionStampBuildBaselineChangelistInt = Module["_kVersionStampBuildBaselineChangelistInt"] = wasmExports["_d"].value;
+  _kVersionStampPrecookedTimestampStr = Module["_kVersionStampPrecookedTimestampStr"] = wasmExports["$d"].value;
+  _kVersionStampPrecookedClientInfoStr = Module["_kVersionStampPrecookedClientInfoStr"] = wasmExports["ae"].value;
+  __indirect_function_table = wasmTable = wasmExports["be"];
+  _kVersionStampBuildHasHardeningProtobuf = Module["_kVersionStampBuildHasHardeningProtobuf"] = wasmExports["dg"].value;
 }
 
 var wasmImports = {
-  /** @export */ gd: BeginGlQueryTiming,
-  /** @export */ fd: EndGlQueryTiming,
-  /** @export */ ed: GetAdapterArchitecture,
-  /** @export */ dd: GetAdapterDescription,
-  /** @export */ cd: GetAdapterDeviceName,
-  /** @export */ bd: GetAdapterVendor,
-  /** @export */ ad: JsOnEmptyPacketListener,
-  /** @export */ $c: JsOnFloat32ArrayImageListener,
-  /** @export */ _c: JsOnFloat32ArrayImageVectorListener,
-  /** @export */ ob: JsOnSimpleListenerBinaryArray,
-  /** @export */ Zc: JsOnSimpleListenerBool,
-  /** @export */ Yc: JsOnSimpleListenerDouble,
-  /** @export */ Xc: JsOnSimpleListenerFloat,
-  /** @export */ Wc: JsOnSimpleListenerInt,
-  /** @export */ Vc: JsOnSimpleListenerString,
-  /** @export */ Uc: JsOnSimpleListenerUint,
-  /** @export */ Tc: JsOnUint8ArrayImageListener,
-  /** @export */ Sc: JsOnUint8ArrayImageVectorListener,
-  /** @export */ P: JsOnVectorFinishedListener,
-  /** @export */ Rc: JsOnVectorListenerBool,
-  /** @export */ Qc: JsOnVectorListenerDouble,
-  /** @export */ Pc: JsOnVectorListenerFloat,
-  /** @export */ Oc: JsOnVectorListenerInt,
-  /** @export */ Nc: JsOnVectorListenerProto,
-  /** @export */ Mc: JsOnVectorListenerString,
-  /** @export */ Lc: JsOnVectorListenerUint,
-  /** @export */ Kc: JsOnWebGLTextureListener,
-  /** @export */ Jc: JsOnWebGLTextureVectorListener,
-  /** @export */ Oa: JsWrapErrorListener,
-  /** @export */ nb: JsWrapImageConverter,
-  /** @export */ u: JsWrapSimpleListeners,
-  /** @export */ mb: UseBottomLeftGpuOrigin,
-  /** @export */ xb: __asyncjs__mediapipe_map_buffer_jspi,
-  /** @export */ r: ___cxa_throw,
-  /** @export */ Ic: ___syscall_dup,
-  /** @export */ Hc: ___syscall_faccessat,
-  /** @export */ lb: ___syscall_fcntl64,
-  /** @export */ Gc: ___syscall_fstat64,
+  /** @export */ qd: BeginGlQueryTiming,
+  /** @export */ pd: EndGlQueryTiming,
+  /** @export */ od: GetAdapterArchitecture,
+  /** @export */ nd: GetAdapterDescription,
+  /** @export */ md: GetAdapterDeviceName,
+  /** @export */ ld: GetAdapterVendor,
+  /** @export */ kd: JsOnEmptyPacketListener,
+  /** @export */ jd: JsOnFloat32ArrayImageListener,
+  /** @export */ id: JsOnFloat32ArrayImageVectorListener,
+  /** @export */ nb: JsOnSimpleListenerBinaryArray,
+  /** @export */ hd: JsOnSimpleListenerBool,
+  /** @export */ gd: JsOnSimpleListenerDouble,
+  /** @export */ fd: JsOnSimpleListenerFloat,
+  /** @export */ ed: JsOnSimpleListenerInt,
+  /** @export */ dd: JsOnSimpleListenerString,
+  /** @export */ cd: JsOnSimpleListenerUint,
+  /** @export */ bd: JsOnUint8ArrayImageListener,
+  /** @export */ ad: JsOnUint8ArrayImageVectorListener,
+  /** @export */ R: JsOnVectorFinishedListener,
+  /** @export */ $c: JsOnVectorListenerBool,
+  /** @export */ _c: JsOnVectorListenerDouble,
+  /** @export */ Zc: JsOnVectorListenerFloat,
+  /** @export */ Yc: JsOnVectorListenerInt,
+  /** @export */ Xc: JsOnVectorListenerProto,
+  /** @export */ Wc: JsOnVectorListenerString,
+  /** @export */ Vc: JsOnVectorListenerUint,
+  /** @export */ Uc: JsOnWebGLTextureListener,
+  /** @export */ Tc: JsOnWebGLTextureVectorListener,
+  /** @export */ Sc: JsWrapErrorListenerInternal,
+  /** @export */ mb: JsWrapImageConverter,
+  /** @export */ Rc: JsWrapLoggingHelpers,
+  /** @export */ v: JsWrapSimpleListeners,
+  /** @export */ lb: UseBottomLeftGpuOrigin,
+  /** @export */ wb: __asyncjs__mediapipe_map_buffer_jspi,
+  /** @export */ n: ___cxa_throw,
+  /** @export */ Qc: ___syscall_dup,
+  /** @export */ Pc: ___syscall_faccessat,
+  /** @export */ E: ___syscall_fcntl64,
+  /** @export */ Oc: ___syscall_fstat64,
   /** @export */ Lb: ___syscall_ftruncate64,
-  /** @export */ Fc: ___syscall_ioctl,
-  /** @export */ Ec: ___syscall_lstat64,
-  /** @export */ Dc: ___syscall_newfstatat,
-  /** @export */ kb: ___syscall_openat,
-  /** @export */ Cc: ___syscall_stat64,
-  /** @export */ xc: __abort_js,
-  /** @export */ Ib: __embind_register_bigint,
-  /** @export */ wc: __embind_register_bool,
-  /** @export */ vc: __embind_register_emval,
+  /** @export */ Nc: ___syscall_getcwd,
+  /** @export */ Mc: ___syscall_getdents64,
+  /** @export */ Lc: ___syscall_getuid32,
+  /** @export */ Kc: ___syscall_ioctl,
+  /** @export */ Jc: ___syscall_lstat64,
+  /** @export */ Ic: ___syscall_mkdirat,
+  /** @export */ Hc: ___syscall_newfstatat,
+  /** @export */ Ra: ___syscall_openat,
+  /** @export */ Gc: ___syscall_readlinkat,
+  /** @export */ Fc: ___syscall_rmdir,
+  /** @export */ Ec: ___syscall_stat64,
+  /** @export */ kb: ___syscall_unlinkat,
+  /** @export */ Dc: ___syscall_utimensat,
+  /** @export */ yc: __abort_js,
+  /** @export */ Hb: __embind_register_bigint,
+  /** @export */ xc: __embind_register_bool,
+  /** @export */ wc: __embind_register_emval,
   /** @export */ ib: __embind_register_float,
-  /** @export */ J: __embind_register_integer,
-  /** @export */ q: __embind_register_memory_view,
-  /** @export */ uc: __embind_register_std_string,
-  /** @export */ La: __embind_register_std_wstring,
-  /** @export */ tc: __embind_register_void,
-  /** @export */ $: __emval_create_invoker,
-  /** @export */ p: __emval_decref,
-  /** @export */ Ka: __emval_get_global,
+  /** @export */ I: __embind_register_integer,
+  /** @export */ r: __embind_register_memory_view,
+  /** @export */ vc: __embind_register_std_string,
+  /** @export */ Pa: __embind_register_std_wstring,
+  /** @export */ uc: __embind_register_void,
+  /** @export */ ba: __emval_create_invoker,
+  /** @export */ q: __emval_decref,
+  /** @export */ Oa: __emval_get_global,
   /** @export */ hb: __emval_get_property,
-  /** @export */ ja: __emval_incref,
-  /** @export */ Ja: __emval_instanceof,
-  /** @export */ _: __emval_invoke,
-  /** @export */ ua: __emval_new_cstring,
-  /** @export */ Z: __emval_run_destructors,
+  /** @export */ la: __emval_incref,
+  /** @export */ Na: __emval_instanceof,
+  /** @export */ aa: __emval_invoke,
+  /** @export */ wa: __emval_new_cstring,
+  /** @export */ $: __emval_run_destructors,
   /** @export */ gb: __emval_set_property,
-  /** @export */ sc: __emval_typeof,
-  /** @export */ Hb: __gmtime_js,
-  /** @export */ Gb: __localtime_js,
-  /** @export */ Fb: __mktime_js,
-  /** @export */ Eb: __mmap_js,
-  /** @export */ Db: __munmap_js,
-  /** @export */ rc: __tzset_js,
+  /** @export */ tc: __emval_typeof,
+  /** @export */ Gb: __gmtime_js,
+  /** @export */ Fb: __localtime_js,
+  /** @export */ Eb: __mktime_js,
+  /** @export */ Db: __mmap_js,
+  /** @export */ Cb: __munmap_js,
+  /** @export */ sc: __tzset_js,
   /** @export */ Kb: _clock_time_get,
-  /** @export */ qc: custom_emscripten_dbgn,
-  /** @export */ Y: _emscripten_asm_const_int,
+  /** @export */ rc: custom_emscripten_dbgn,
+  /** @export */ _: _emscripten_asm_const_int,
   /** @export */ fb: _emscripten_asm_const_ptr,
-  /** @export */ Ia: _emscripten_errn,
-  /** @export */ pc: _emscripten_get_heap_max,
+  /** @export */ Ma: _emscripten_errn,
+  /** @export */ qc: _emscripten_get_heap_max,
   /** @export */ y: _emscripten_get_now,
-  /** @export */ ia: _emscripten_has_asyncify,
-  /** @export */ oc: _emscripten_outn,
-  /** @export */ nc: _emscripten_pc_get_function,
-  /** @export */ mc: _emscripten_resize_heap,
+  /** @export */ T: _emscripten_has_asyncify,
+  /** @export */ pc: _emscripten_outn,
+  /** @export */ oc: _emscripten_pc_get_function,
+  /** @export */ nc: _emscripten_resize_heap,
   /** @export */ eb: _emscripten_stack_snapshot,
-  /** @export */ lc: _emscripten_stack_unwind_buffer,
-  /** @export */ kc: _emscripten_webgl_create_context,
-  /** @export */ jc: _emscripten_webgl_destroy_context,
-  /** @export */ ic: _emscripten_webgl_get_context_attributes,
-  /** @export */ ha: _emscripten_webgl_get_current_context,
-  /** @export */ hc: _emscripten_webgl_make_context_current,
-  /** @export */ R: _emscripten_webgpu_get_device,
-  /** @export */ gc: _emwgpuBufferDestroy,
-  /** @export */ fc: _emwgpuBufferGetMappedRange,
-  /** @export */ ec: _emwgpuBufferUnmap,
-  /** @export */ x: _emwgpuDelete,
-  /** @export */ dc: _emwgpuDeviceCreateBuffer,
-  /** @export */ Cb: _emwgpuDeviceCreateComputePipelineAsync,
-  /** @export */ Bb: _emwgpuDeviceCreateRenderPipelineAsync,
-  /** @export */ cc: _emwgpuDeviceCreateShaderModule,
-  /** @export */ bc: _emwgpuDeviceDestroy,
-  /** @export */ ac: _emwgpuWaitAny,
-  /** @export */ Bc: _environ_get,
-  /** @export */ Ac: _environ_sizes_get,
-  /** @export */ db: _exit,
-  /** @export */ Na: _fd_close,
+  /** @export */ mc: _emscripten_stack_unwind_buffer,
+  /** @export */ lc: _emscripten_webgl_create_context,
+  /** @export */ kc: _emscripten_webgl_destroy_context,
+  /** @export */ jc: _emscripten_webgl_get_context_attributes,
+  /** @export */ ka: _emscripten_webgl_get_current_context,
+  /** @export */ ic: _emscripten_webgl_make_context_current,
+  /** @export */ Q: _emscripten_webgpu_get_device,
+  /** @export */ hc: _emwgpuBufferDestroy,
+  /** @export */ gc: _emwgpuBufferGetMappedRange,
+  /** @export */ fc: _emwgpuBufferUnmap,
+  /** @export */ u: _emwgpuDelete,
+  /** @export */ ec: _emwgpuDeviceCreateBuffer,
+  /** @export */ Bb: _emwgpuDeviceCreateComputePipelineAsync,
+  /** @export */ Ab: _emwgpuDeviceCreateRenderPipelineAsync,
+  /** @export */ dc: _emwgpuDeviceCreateShaderModule,
+  /** @export */ cc: _emwgpuDeviceDestroy,
+  /** @export */ bc: _emwgpuWaitAny,
+  /** @export */ Cc: _environ_get,
+  /** @export */ Bc: _environ_sizes_get,
+  /** @export */ ac: _exit,
+  /** @export */ ma: _fd_close,
+  /** @export */ Jb: _fd_pread,
   /** @export */ jb: _fd_read,
-  /** @export */ Jb: _fd_seek,
-  /** @export */ Ma: _fd_write,
+  /** @export */ Ib: _fd_seek,
+  /** @export */ Qa: _fd_write,
   /** @export */ b: _glActiveTexture,
-  /** @export */ ta: _glAttachShader,
+  /** @export */ va: _glAttachShader,
   /** @export */ $b: _glBindAttribLocation,
   /** @export */ c: _glBindBuffer,
-  /** @export */ cb: _glBindBufferBase,
+  /** @export */ db: _glBindBufferBase,
   /** @export */ t: _glBindFramebuffer,
   /** @export */ a: _glBindTexture,
   /** @export */ m: _glBindVertexArray,
-  /** @export */ bb: _glBlendEquation,
+  /** @export */ cb: _glBlendEquation,
   /** @export */ _b: _glBlendFunc,
   /** @export */ j: _glBufferData,
-  /** @export */ I: _glClear,
-  /** @export */ H: _glClearColor,
-  /** @export */ da: _glClientWaitSync,
-  /** @export */ ga: _glColorMask,
-  /** @export */ ab: _glCompileShader,
-  /** @export */ $a: _glCreateProgram,
-  /** @export */ _a: _glCreateShader,
-  /** @export */ o: _glDeleteBuffers,
-  /** @export */ Q: _glDeleteFramebuffers,
+  /** @export */ P: _glClear,
+  /** @export */ O: _glClearColor,
+  /** @export */ fa: _glClientWaitSync,
+  /** @export */ ja: _glColorMask,
+  /** @export */ bb: _glCompileShader,
+  /** @export */ ab: _glCreateProgram,
+  /** @export */ La: _glCreateShader,
+  /** @export */ p: _glDeleteBuffers,
+  /** @export */ S: _glDeleteFramebuffers,
   /** @export */ h: _glDeleteProgram,
-  /** @export */ sa: _glDeleteShader,
-  /** @export */ ra: _glDeleteSync,
+  /** @export */ ia: _glDeleteShader,
+  /** @export */ ua: _glDeleteSync,
   /** @export */ D: _glDeleteTextures,
   /** @export */ A: _glDeleteVertexArrays,
-  /** @export */ Za: _glDetachShader,
-  /** @export */ G: _glDisable,
-  /** @export */ n: _glDisableVertexAttribArray,
+  /** @export */ $a: _glDetachShader,
+  /** @export */ H: _glDisable,
+  /** @export */ o: _glDisableVertexAttribArray,
   /** @export */ i: _glDrawArrays,
-  /** @export */ fa: _glDrawBuffers,
+  /** @export */ ha: _glDrawBuffers,
   /** @export */ Zb: _glEnable,
   /** @export */ l: _glEnableVertexAttribArray,
-  /** @export */ Ya: _glFenceSync,
-  /** @export */ qa: _glFinish,
-  /** @export */ v: _glFlush,
+  /** @export */ _a: _glFenceSync,
+  /** @export */ ta: _glFinish,
+  /** @export */ x: _glFlush,
   /** @export */ C: _glFramebufferTexture2D,
-  /** @export */ Xa: _glFramebufferTextureLayer,
+  /** @export */ Za: _glFramebufferTextureLayer,
   /** @export */ s: _glGenBuffers,
-  /** @export */ X: _glGenFramebuffers,
-  /** @export */ F: _glGenTextures,
+  /** @export */ Z: _glGenFramebuffers,
+  /** @export */ G: _glGenTextures,
   /** @export */ B: _glGenVertexArrays,
-  /** @export */ Wa: _glGetAttribLocation,
-  /** @export */ ea: _glGetError,
+  /** @export */ Ya: _glGetAttribLocation,
+  /** @export */ ga: _glGetError,
   /** @export */ Yb: _glGetFloatv,
   /** @export */ w: _glGetIntegerv,
   /** @export */ Xb: _glGetProgramiv,
   /** @export */ Wb: _glGetShaderInfoLog,
   /** @export */ Vb: _glGetShaderiv,
-  /** @export */ O: _glGetString,
+  /** @export */ N: _glGetString,
   /** @export */ Ub: _glGetUniformBlockIndex,
   /** @export */ d: _glGetUniformLocation,
   /** @export */ Tb: _glLineWidth,
-  /** @export */ Va: _glLinkProgram,
-  /** @export */ pa: _glPixelStorei,
-  /** @export */ oa: _glReadPixels,
-  /** @export */ Ua: _glShaderSource,
-  /** @export */ E: _glTexImage2D,
-  /** @export */ na: _glTexParameterf,
-  /** @export */ Ta: _glTexParameterfv,
+  /** @export */ Xa: _glLinkProgram,
+  /** @export */ sa: _glPixelStorei,
+  /** @export */ ra: _glReadPixels,
+  /** @export */ Ka: _glShaderSource,
+  /** @export */ F: _glTexImage2D,
+  /** @export */ qa: _glTexParameterf,
+  /** @export */ Wa: _glTexParameterfv,
   /** @export */ f: _glTexParameteri,
-  /** @export */ ma: _glTexStorage2D,
+  /** @export */ pa: _glTexStorage2D,
   /** @export */ Sb: _glTexStorage3D,
-  /** @export */ W: _glTexSubImage2D,
+  /** @export */ Y: _glTexSubImage2D,
   /** @export */ Rb: _glTexSubImage3D,
-  /** @export */ N: _glUniform1f,
-  /** @export */ la: _glUniform1fv,
+  /** @export */ M: _glUniform1f,
+  /** @export */ oa: _glUniform1fv,
   /** @export */ e: _glUniform1i,
-  /** @export */ V: _glUniform2f,
+  /** @export */ X: _glUniform2f,
   /** @export */ Qb: _glUniform2fv,
-  /** @export */ Ha: _glUniform3f,
-  /** @export */ Sa: _glUniform4f,
-  /** @export */ U: _glUniform4fv,
+  /** @export */ Ja: _glUniform3f,
+  /** @export */ Va: _glUniform4f,
+  /** @export */ W: _glUniform4fv,
   /** @export */ Pb: _glUniform4iv,
   /** @export */ Ob: _glUniformBlockBinding,
   /** @export */ Nb: _glUniformMatrix2fv,
   /** @export */ Mb: _glUniformMatrix3fv,
-  /** @export */ Ga: _glUniformMatrix4fv,
+  /** @export */ Ia: _glUniformMatrix4fv,
   /** @export */ g: _glUseProgram,
   /** @export */ k: _glVertexAttribPointer,
-  /** @export */ T: _glViewport,
-  /** @export */ Ab: mediapipe_create_utility_canvas2d,
-  /** @export */ zb: _mediapipe_find_canvas_event_target,
-  /** @export */ yb: mediapipe_import_external_texture,
-  /** @export */ wb: _mediapipe_webgl_tex_image_drawable,
-  /** @export */ zc: _proc_exit,
-  /** @export */ yc: _random_get,
-  /** @export */ Fa: _wgpuCommandEncoderBeginComputePass,
-  /** @export */ Ea: _wgpuCommandEncoderBeginRenderPass,
-  /** @export */ vb: _wgpuCommandEncoderCopyBufferToTexture,
-  /** @export */ ub: _wgpuCommandEncoderCopyTextureToBuffer,
-  /** @export */ tb: _wgpuCommandEncoderCopyTextureToTexture,
-  /** @export */ M: _wgpuCommandEncoderFinish,
-  /** @export */ Da: _wgpuComputePassEncoderDispatchWorkgroups,
-  /** @export */ Ca: _wgpuComputePassEncoderEnd,
-  /** @export */ Ba: _wgpuComputePassEncoderSetBindGroup,
-  /** @export */ Aa: _wgpuComputePassEncoderSetPipeline,
-  /** @export */ za: _wgpuComputePipelineGetBindGroupLayout,
-  /** @export */ ca: _wgpuDeviceCreateBindGroup,
-  /** @export */ sb: _wgpuDeviceCreateBindGroupLayout,
-  /** @export */ L: _wgpuDeviceCreateCommandEncoder,
-  /** @export */ rb: _wgpuDeviceCreateComputePipeline,
-  /** @export */ qb: _wgpuDeviceCreatePipelineLayout,
-  /** @export */ Ra: _wgpuDeviceCreateRenderPipeline,
-  /** @export */ S: _wgpuDeviceCreateSampler,
-  /** @export */ ba: _wgpuDeviceCreateTexture,
-  /** @export */ K: _wgpuQueueSubmit,
-  /** @export */ ka: _wgpuQueueWriteBuffer,
-  /** @export */ pb: _wgpuQueueWriteTexture,
-  /** @export */ ya: _wgpuRenderPassEncoderDraw,
-  /** @export */ xa: _wgpuRenderPassEncoderEnd,
-  /** @export */ wa: _wgpuRenderPassEncoderSetBindGroup,
-  /** @export */ va: _wgpuRenderPassEncoderSetPipeline,
-  /** @export */ Qa: _wgpuRenderPipelineGetBindGroupLayout,
+  /** @export */ V: _glViewport,
+  /** @export */ zb: mediapipe_create_utility_canvas2d,
+  /** @export */ yb: _mediapipe_find_canvas_event_target,
+  /** @export */ xb: mediapipe_import_external_texture,
+  /** @export */ vb: _mediapipe_webgl_tex_image_drawable,
+  /** @export */ Ac: _proc_exit,
+  /** @export */ zc: _random_get,
+  /** @export */ Ha: _wgpuCommandEncoderBeginComputePass,
+  /** @export */ Ga: _wgpuCommandEncoderBeginRenderPass,
+  /** @export */ ub: _wgpuCommandEncoderCopyBufferToTexture,
+  /** @export */ tb: _wgpuCommandEncoderCopyTextureToBuffer,
+  /** @export */ sb: _wgpuCommandEncoderCopyTextureToTexture,
+  /** @export */ L: _wgpuCommandEncoderFinish,
+  /** @export */ Fa: _wgpuComputePassEncoderDispatchWorkgroups,
+  /** @export */ Ea: _wgpuComputePassEncoderEnd,
+  /** @export */ Da: _wgpuComputePassEncoderSetBindGroup,
+  /** @export */ Ca: _wgpuComputePassEncoderSetPipeline,
+  /** @export */ Ba: _wgpuComputePipelineGetBindGroupLayout,
+  /** @export */ ea: _wgpuDeviceCreateBindGroup,
+  /** @export */ rb: _wgpuDeviceCreateBindGroupLayout,
+  /** @export */ K: _wgpuDeviceCreateCommandEncoder,
+  /** @export */ qb: _wgpuDeviceCreateComputePipeline,
+  /** @export */ pb: _wgpuDeviceCreatePipelineLayout,
+  /** @export */ Ua: _wgpuDeviceCreateRenderPipeline,
+  /** @export */ U: _wgpuDeviceCreateSampler,
+  /** @export */ da: _wgpuDeviceCreateTexture,
+  /** @export */ J: _wgpuQueueSubmit,
+  /** @export */ na: _wgpuQueueWriteBuffer,
+  /** @export */ ob: _wgpuQueueWriteTexture,
+  /** @export */ Aa: _wgpuRenderPassEncoderDraw,
+  /** @export */ za: _wgpuRenderPassEncoderEnd,
+  /** @export */ ya: _wgpuRenderPassEncoderSetBindGroup,
+  /** @export */ xa: _wgpuRenderPassEncoderSetPipeline,
+  /** @export */ Ta: _wgpuRenderPipelineGetBindGroupLayout,
   /** @export */ z: _wgpuTextureCreateView,
-  /** @export */ Pa: _wgpuTextureDestroy,
-  /** @export */ aa: _wgpuTextureGetFormat
+  /** @export */ Sa: _wgpuTextureDestroy,
+  /** @export */ ca: _wgpuTextureGetFormat
 };
 
 // include: postamble.js
 // === Auto-generated postamble setup entry stuff ===
-function run() {
-  if (runDependencies > 0) {
-    dependenciesFulfilled = run;
-    return;
-  }
+async function run() {
   preRun();
-  // a preRun added a dependency, run will be called later
-  if (runDependencies > 0) {
-    dependenciesFulfilled = run;
-    return;
+  if (runDependencies) {
+    await resolveRunDependencies();
   }
-  function doRun() {
-    // run may have just been called through dependencies being fulfilled just in this very frame,
-    // or while the async setStatus time below was happening
-    Module["calledRun"] = true;
-    if (ABORT) return;
-    initRuntime();
-    readyPromiseResolve?.(Module);
-    Module["onRuntimeInitialized"]?.();
-    postRun();
+  var setStatus = Module["setStatus"];
+  if (setStatus) {
+    setStatus("Running...");
+    // Yield to the event loop to allow the browser to paint "Running..."
+    await new Promise(resolve => setTimeout(resolve, 1));
+    // Then we want to clear the status text, but only after the rest of this function runs.
+    setTimeout(setStatus, 1, "");
   }
-  if (Module["setStatus"]) {
-    Module["setStatus"]("Running...");
-    setTimeout(() => {
-      setTimeout(() => Module["setStatus"](""), 1);
-      doRun();
-    }, 1);
-  } else {
-    doRun();
-  }
+  if (ABORT) return;
+  initRuntime();
+  Module["onRuntimeInitialized"]?.();
+  postRun();
 }
 
 var wasmExports;
 
 // In modularize mode the generated code is within a factory function so we
 // can use await here (since it's not top-level-await).
-wasmExports = await (createWasm());
+wasmExports = await createWasm();
 
-run();
-
-// end include: postamble.js
-// include: postamble_modularize.js
-// In MODULARIZE mode we wrap the generated code in a factory function
-// and return either the Module itself, or a promise of the module.
-// We assign to the `moduleRtn` global here and configure closure to see
-// this as an extern so it won't get minified.
-if (runtimeInitialized) {
-  moduleRtn = Module;
-} else {
-  // Set up the promise that indicates the Module is initialized
-  moduleRtn = new Promise((resolve, reject) => {
-    readyPromiseResolve = resolve;
-    readyPromiseReject = reject;
-  });
-}
+await run();
 
 
-    return moduleRtn;
+    return Module;
   };
 })();
 
