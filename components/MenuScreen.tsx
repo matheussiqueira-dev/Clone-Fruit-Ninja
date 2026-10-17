@@ -59,9 +59,26 @@ const MenuScreen: React.FC<MenuScreenProps> = ({
             {PRODUCT_NAME}
           </h1>
           <p className="max-w-measure text-lead text-fg-secondary">
-            Corte as frutas que sobem, encadeie combos e desvie das bombas. Três frutas no chão encerram a
-            partida.
+            Corte as frutas que sobem, encadeie combos e desvie das bombas. Você tem cinco vidas.
           </p>
+          <ul className="grid gap-2 text-small text-fg-secondary sm:grid-cols-2" aria-label="Regras">
+            <li>
+              <span aria-hidden="true">🍉🍍🍓</span> Corte as frutas: vários cortes seguidos rendem combo.
+            </li>
+            <li>
+              <span aria-hidden="true">✨</span> Três ou mais frutas num só golpe dão bônus.
+            </li>
+            <li>
+              <span aria-hidden="true">💣</span> Bomba cortada tira uma vida.
+            </li>
+            <li>
+              <span aria-hidden="true">💖</span> Corte o coração para recuperar uma vida.
+            </li>
+            <li className="sm:col-span-2">
+              <span aria-hidden="true">💔</span> Cada fruta que cai no chão é um erro; cinco erros encerram a
+              partida.
+            </li>
+          </ul>
           <p className="text-caption text-fg-secondary" role="status">
             {statusText}
           </p>
@@ -80,7 +97,8 @@ const MenuScreen: React.FC<MenuScreenProps> = ({
             <span>
               <span className="block text-small font-semibold text-fg">Câmera</span>
               <span className="block text-caption text-fg-secondary">
-                Corte com a ponta do indicador diante da webcam.
+                Corte com um movimento rápido da ponta do indicador. Fique a cerca de um metro da webcam, com
+                boa luz.
               </span>
             </span>
           </label>

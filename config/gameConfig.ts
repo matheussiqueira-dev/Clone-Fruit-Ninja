@@ -26,7 +26,8 @@ export const DEFAULT_SETTINGS: GameSettings = {
   lowVfx: false
 };
 
-export const MAX_LIVES = 3;
+// Five mistakes (a dropped fruit or a cut bomb) end the round.
+export const MAX_LIVES = 5;
 
 export const INITIAL_STATS: GameStats = {
   score: 0,

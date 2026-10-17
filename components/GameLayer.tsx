@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { GameOverReason, GameSettings, GameState, GameStats, VisionResult } from '../types';
+import { GameOverReason, GameSettings, GameState, GameStats, InputMode, VisionResult } from '../types';
 import { readCanvasTokens } from '../config/artPalette';
 import { createGameEngine, GameEngine } from '../lib/engine/gameEngine';
 import { createSeededRng } from '../lib/engine/rng';
@@ -16,6 +16,8 @@ interface GameLayerProps {
   // Seed for a reproducible round (daily challenge); null plays a random round.
   seed: number | null;
   maxLives: number;
+  // Camera play gets a wider blade reach: a tracked fingertip is less precise than a mouse.
+  inputMode: InputMode;
   onStatsUpdate: (stats: Partial<GameStats>) => void;
   onGameOver: (finalStats: GameStats, reason: GameOverReason) => void;
   width: number;
@@ -24,6 +26,7 @@ interface GameLayerProps {
 
 const TRAIL_LIMIT = 14;
 const TRAIL_LIMIT_LOW_VFX = 8;
+const HIT_ASSIST: Record<InputMode, number> = { camera: 1.8, pointer: 1 };
 
 // React shell around the pure engine (lib/engine): owns the canvas and the frame loop,
 // feeds the engine time and blade input, and hands its state to the renderer.
@@ -35,6 +38,7 @@ const GameLayer: React.FC<GameLayerProps> = ({
   reducedMotion,
   seed,
   maxLives,
+  inputMode,
   onStatsUpdate,
   onGameOver,
   width,
@@ -83,7 +87,8 @@ const GameLayer: React.FC<GameLayerProps> = ({
       maxLives,
       rng: seed === null ? Math.random : createSeededRng(seed),
       particles: effectsEnabled,
-      trailLimit
+      trailLimit,
+      hitAssist: HIT_ASSIST[inputMode]
     });
     lastFrameRef.current = null;
     onStatsUpdate({ ...engineRef.current.stats });
@@ -92,8 +97,12 @@ const GameLayer: React.FC<GameLayerProps> = ({
   }, [gameState, seed, maxLives, onStatsUpdate]);
 
   useEffect(() => {
-    engineRef.current?.setOptions({ particles: effectsEnabled, trailLimit });
-  }, [effectsEnabled, trailLimit]);
+    engineRef.current?.setOptions({
+      particles: effectsEnabled,
+      trailLimit,
+      hitAssist: HIT_ASSIST[inputMode]
+    });
+  }, [effectsEnabled, trailLimit, inputMode]);
 
   useEffect(() => {
     const ctx = ctxRef.current;
@@ -128,7 +137,12 @@ const GameLayer: React.FC<GameLayerProps> = ({
         landmarks: hand?.landmarks,
         showSkeleton: settings.showHandSkeleton,
         showTrail: settings.showTrail && !reducedMotion,
-        trailWidth: settings.lowVfx ? 6 : 9
+        trailWidth: settings.lowVfx ? 7 : 11,
+        cursor: blade,
+        // A mouse already has its own cursor; a tracked hand needs one drawn.
+        showCursor: inputMode === 'camera',
+        flashes: !reducedMotion,
+        now
       });
 
       if (result.stats) onStatsUpdate(result.stats);
@@ -144,7 +158,18 @@ const GameLayer: React.FC<GameLayerProps> = ({
     return () => {
       if (requestRef.current !== null) cancelAnimationFrame(requestRef.current);
     };
-  }, [gameState, paused, reducedMotion, width, height, settings, handPositionRef, onStatsUpdate, onGameOver]);
+  }, [
+    gameState,
+    paused,
+    reducedMotion,
+    width,
+    height,
+    settings,
+    inputMode,
+    handPositionRef,
+    onStatsUpdate,
+    onGameOver
+  ]);
 
   return <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none absolute inset-0 z-1" />;
 };

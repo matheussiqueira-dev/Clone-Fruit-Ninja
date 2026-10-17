@@ -290,6 +290,7 @@ const App: React.FC = () => {
             reducedMotion={prefersReducedMotion}
             seed={roundSeed}
             maxLives={MAX_LIVES}
+            inputMode={inputMode}
             onStatsUpdate={handleStatsUpdate}
             onGameOver={handleGameOver}
             width={isPlaying ? stageSize.width : 0}

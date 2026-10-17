@@ -39,8 +39,8 @@ const shareOrCopy = async (title: string, text: string, url: string): Promise<'s
 };
 
 const REASON_TEXT: Record<GameOverReason, string> = {
-  bomb: 'Você cortou uma bomba.',
-  lives: 'Três frutas caíram no chão.'
+  bomb: 'Uma bomba levou sua última vida. 💣',
+  lives: 'Cinco erros: suas vidas acabaram. 💔'
 };
 
 type SaveState =

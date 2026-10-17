@@ -5,6 +5,14 @@ Todas as mudanças relevantes deste projeto. Formato [Keep a Changelog](https://
 ## Não lançado
 
 ### Alterado
+- Jogabilidade: cinco vidas; a bomba tira uma vida em vez de encerrar a partida; frutas maiores (proporcionais à tela), mais lentas no início, sem bombas no aquecimento e lançadas em grupos para cortes múltiplos.
+- Rastreamento da mão mais estável: filtro One Euro na ponta do dedo, limiares de detecção menores, tolerância a perdas curtas da mão e posição alinhada ao vídeo exibido (`object-fit: cover`).
+- A lâmina só corta acima de uma velocidade mínima, então mão ou cursor parado não corta bomba por acidente; alcance maior no modo câmera.
+- Frutas, bomba e coração desenhados com emojis; metades com face de corte.
+
+### Adicionado
+- Coração 💖 que devolve uma vida, só quando falta alguma.
+- Bônus por três ou mais frutas num só golpe, textos flutuantes de pontos/combo/vida, marcador da ponta do dedo e aviso visual ao perder ou ganhar vida.
 - Tailwind CSS 4 com o plugin do Vite; sem PostCSS nem autoprefixer. O texto do corpo segue a altura de linha do design system (1,6).
 - Vite 8 (Rolldown): build de produção em menos de 1 s e JS inicial 2,5% menor.
 - MediaPipe Tasks Vision 1.1.1. O runtime WASM passa de 11,5 MB para 13,5 MB.

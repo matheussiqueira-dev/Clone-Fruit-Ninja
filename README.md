@@ -9,7 +9,7 @@ Jogo de corte no navegador: corte frutas com a ponta do indicador diante da webc
 
 - Frutas sobem do fundo do palco. Corte com um movimento: o cursor ou o dedo parado não corta.
 - Cortes em sequência rápida formam combos de até x5, que multiplicam os pontos.
-- Cortar uma bomba (a esfera com anel tracejado) encerra a partida. Três frutas no chão também.
+- Você tem cinco vidas. Cada fruta no chão e cada bomba 💣 cortada (anel tracejado) tira uma; o coração 💖 devolve uma.
 - A fruta cortada se parte em duas metades na direção exata do corte.
 
 ### Modos

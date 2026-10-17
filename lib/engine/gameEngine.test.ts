@@ -116,16 +116,81 @@ describe('createGameEngine', () => {
     expect(engine.state.splats).toHaveLength(1);
   });
 
-  it('ends the round when the blade crosses a bomb', () => {
+  it('a bomb costs one life and resets the combo instead of ending the round', () => {
     const engine = makeEngine();
     parkFruit(engine, { id: 'bomb', type: 'bomb', kind: 'bomb' });
     const result = swipe(engine, 300, 500, 300, 1000);
-    expect(result.gameOver).toBe('bomb');
-    // A finished engine ignores further steps.
-    expect(engine.step(FRAME, 5000, { x: 0, y: 0 })).toEqual({ stats: null, gameOver: null });
+    expect(result.gameOver).toBeNull();
+    expect(engine.stats.lives).toBe(2);
+    expect(engine.stats.combo).toBe(0);
+    expect(engine.state.fruits.some((fruit) => fruit.id === 'bomb')).toBe(false);
   });
 
-  it('ends the round after three dropped fruit', () => {
+  it('ends the round when a bomb takes the last life', () => {
+    const engine = makeEngine();
+    let result = null;
+    for (let i = 0; i < 3; i++) {
+      parkFruit(engine, { id: `bomb-${i}`, type: 'bomb', kind: 'bomb' });
+      // Each swipe comes after the post-bomb grace period.
+      result = swipe(engine, 300, 500, 300, 1000 + i * 2000);
+      engine.breakStroke();
+    }
+    expect(result?.gameOver).toBe('bomb');
+    expect(engine.stats.lives).toBe(0);
+    // A finished engine ignores further steps.
+    expect(engine.step(FRAME, 9000, { x: 0, y: 0 })).toEqual({ stats: null, gameOver: null });
+  });
+
+  it('ignores a second bomb in the same swipe', () => {
+    const engine = makeEngine();
+    parkFruit(engine, { id: 'bomb-a', type: 'bomb', kind: 'bomb', x: 340 });
+    parkFruit(engine, { id: 'bomb-b', type: 'bomb', kind: 'bomb', x: 460 });
+    swipe(engine, 300, 500, 300, 1000);
+    expect(engine.stats.lives).toBe(2);
+  });
+
+  it('a sliced heart gives back one life, never above the maximum', () => {
+    const engine = makeEngine();
+    parkFruit(engine, { id: 'bomb', type: 'bomb', kind: 'bomb' });
+    swipe(engine, 300, 500, 300, 1000);
+    engine.breakStroke();
+    expect(engine.stats.lives).toBe(2);
+
+    parkFruit(engine, { id: 'heart-1', type: 'life', kind: 'heart' });
+    swipe(engine, 300, 500, 300, 3000);
+    engine.breakStroke();
+    expect(engine.stats.lives).toBe(3);
+
+    parkFruit(engine, { id: 'heart-2', type: 'life', kind: 'heart' });
+    swipe(engine, 300, 500, 300, 5000);
+    expect(engine.stats.lives).toBe(3);
+    // Hearts are not fruit: no score and no slice count.
+    expect(engine.stats.score).toBe(0);
+    expect(engine.stats.sliced).toBe(0);
+  });
+
+  it('a slow blade (hovering hand or cursor) never cuts', () => {
+    const engine = makeEngine();
+    parkFruit(engine);
+    // 4 px every 32 ms: 125 px/s, below the cutting speed.
+    for (let i = 0; i <= 50; i++) engine.step(FRAME, 1000 + i * 32, { x: 300 + i * 4, y: 300 });
+    expect(engine.stats.score).toBe(0);
+    expect(engine.state.bladeCutting).toBe(false);
+  });
+
+  it('several fruit in one swipe earn a bonus on top of the combo', () => {
+    const engine = makeEngine();
+    parkFruit(engine, { id: 'a', x: 250 });
+    parkFruit(engine, { id: 'b', x: 400 });
+    parkFruit(engine, { id: 'c', x: 550 });
+    swipe(engine, 150, 650, 300, 1000, 12);
+    expect(engine.stats.sliced).toBe(3);
+    // Combo 1 + 2 + 3, plus a bonus of 3 for the triple cut.
+    expect(engine.stats.score).toBe(9);
+    expect(engine.state.popups.some((popup) => popup.tone === 'bonus')).toBe(true);
+  });
+
+  it('ends the round after the last life is lost to dropped fruit', () => {
     const engine = makeEngine();
     let gameOver = null;
     for (let i = 0; i < 3 && !gameOver; i++) {

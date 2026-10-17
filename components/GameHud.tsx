@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, Settings } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { GameStats } from '../types';
 import { formatInteger } from '../lib/stats';
 
@@ -20,25 +20,26 @@ const GameHud: React.FC<GameHudProps> = ({ stats, maxLives, onOpenSettings }) =>
         </div>
         <div className="flex items-baseline gap-2">
           <dt className="sr-only sm:not-sr-only text-fine text-fg-secondary">Combo</dt>
-          <dd className="ms-num text-small font-semibold text-fg">x{Math.max(1, stats.combo)}</dd>
+          <dd className="ms-num text-small font-semibold text-fg">
+            {stats.combo >= 2 && <span aria-hidden="true">🔥 </span>}x{Math.max(1, stats.combo)}
+          </dd>
         </div>
         <div className="flex items-center gap-2">
           <dt className="sr-only sm:not-sr-only text-fine text-fg-secondary">Vidas</dt>
-          <dd className="flex items-center gap-1">
+          <dd className="flex items-center gap-0.5" aria-live="polite">
             <span className="ms-sr-only">
               {stats.lives} de {maxLives}
             </span>
             {Array.from({ length: maxLives }).map((_, index) => {
               const alive = index < stats.lives;
               return (
-                <Heart
+                <span
                   key={index}
-                  size={16}
-                  strokeWidth={1.75}
                   aria-hidden="true"
-                  className={alive ? 'text-fg' : 'text-fg-disabled'}
-                  fill={alive ? 'currentColor' : 'none'}
-                />
+                  className={`text-small leading-none transition-opacity ${alive ? '' : 'opacity-35 grayscale'}`}
+                >
+                  {alive ? '❤️' : '🖤'}
+                </span>
               );
             })}
           </dd>

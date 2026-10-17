@@ -1,27 +1,55 @@
 export const TARGET_FPS = 60;
-export const BASE_SPAWN_FRAMES = 60;
-export const MIN_SPAWN_FRAMES = 18;
-export const COMBO_WINDOW = 0.9;
-export const COMBO_TIMEOUT = 1.4;
+// A volley every 1.25 s at the start, down to one every 0.55 s.
+export const BASE_SPAWN_FRAMES = 75;
+export const MIN_SPAWN_FRAMES = 33;
+export const COMBO_WINDOW = 1.1;
+export const COMBO_TIMEOUT = 1.6;
 export const MAX_COMBO = 5;
 
 export const getSpawnInterval = (score: number, fps: number = TARGET_FPS) => {
   const safeScore = Number.isFinite(score) ? Math.max(0, Math.floor(score)) : 0;
-  const spawnFrames = Math.max(MIN_SPAWN_FRAMES, BASE_SPAWN_FRAMES - Math.floor(safeScore / 4));
+  const spawnFrames = Math.max(MIN_SPAWN_FRAMES, BASE_SPAWN_FRAMES - Math.floor(safeScore / 5));
   return spawnFrames / fps;
 };
 
+// No bombs while the player warms up; then a gentle ramp with a low ceiling.
+export const BOMB_GRACE_SCORE = 6;
 export const getBombChance = (score: number) => {
   const safeScore = Number.isFinite(score) ? Math.max(0, score) : 0;
-  const base = 0.12;
-  const max = 0.22;
-  return Math.min(max, base + safeScore * 0.0015);
+  if (safeScore < BOMB_GRACE_SCORE) return 0;
+  const base = 0.08;
+  const max = 0.16;
+  return Math.min(max, base + safeScore * 0.0008);
 };
 
 export const getSpeedMultiplier = (score: number) => {
   const safeScore = Number.isFinite(score) ? Math.max(0, score) : 0;
-  const ramp = Math.min(1, safeScore / 120);
-  return 1 + ramp * 0.35;
+  const ramp = Math.min(1, safeScore / 150);
+  return 1 + ramp * 0.3;
+};
+
+// Fruit per volley: one at first, then pairs and trios so a single swipe can cut several.
+export const getVolleySize = (score: number, roll: number) => {
+  const safeScore = Number.isFinite(score) ? Math.max(0, score) : 0;
+  const safeRoll = Number.isFinite(roll) ? Math.min(0.999, Math.max(0, roll)) : 0;
+  const multiChance = Math.min(0.7, safeScore * 0.02);
+  if (safeRoll >= multiChance) return 1;
+  // Inside the multi band, the lower third throws a trio (four later on).
+  const inBand = safeRoll / Math.max(multiChance, 1e-6);
+  if (inBand < 0.3) return safeScore >= 60 ? 4 : 3;
+  return 2;
+};
+
+// A heart shows up only when a life is missing, more often the fewer are left.
+export const getLifeChance = (lives: number, maxLives: number) => {
+  if (!Number.isFinite(lives) || !Number.isFinite(maxLives) || lives >= maxLives) return 0;
+  const missing = Math.max(0, maxLives - Math.max(0, lives));
+  return Math.min(0.18, 0.04 + missing * 0.03);
+};
+
+export const applyLifeGain = (lives: number, maxLives: number) => {
+  const safeLives = Number.isFinite(lives) ? Math.max(0, Math.floor(lives)) : 0;
+  return Math.min(Math.max(0, Math.floor(maxLives)), safeLives + 1);
 };
 
 export const distanceToSegmentSq = (
@@ -97,8 +125,11 @@ export const applyMiss = (lives: number) => {
 };
 
 // The blade only cuts while it moves: a resting cursor or hand must not slice what flies into it.
-export const BLADE_IDLE_MS = 80;
-export const MIN_BLADE_SEGMENT_PX = 4;
+// The idle window is long enough to bridge a camera frame (hand tracking runs at 15-30 Hz).
+export const BLADE_IDLE_MS = 140;
+export const MIN_BLADE_SEGMENT_PX = 3;
+// A blade slower than this (px/s) is a hovering hand or cursor, not a swipe: it never cuts.
+export const MIN_CUT_SPEED = 220;
 
 export const isBladeActive = (lastMoveAt: number, now: number, idleMs = BLADE_IDLE_MS) =>
   Number.isFinite(lastMoveAt) && now >= lastMoveAt && now - lastMoveAt <= idleMs;

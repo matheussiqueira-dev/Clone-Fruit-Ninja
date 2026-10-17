@@ -33,7 +33,7 @@ test('a resting cursor never slices, so the game ends by dropped fruit', async (
   await page.mouse.move(stage.x + stage.width / 2, stage.y + stage.height / 2);
 
   await expect(page.getByRole('heading', { level: 1, name: 'Fim de jogo' })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText('Três frutas caíram no chão.')).toBeVisible();
+  await expect(page.getByText('Cinco erros: suas vidas acabaram. 💔')).toBeVisible();
   await expect(page.locator('dt:text-is("Pontuação") + dd')).toHaveText('0');
 });
 
@@ -113,10 +113,10 @@ test('opening Ajustes pauses the round', async ({ page }) => {
   await startPointerGame(page);
   await page.getByRole('button', { name: 'Ajustes' }).click();
   await expect(page.getByRole('dialog', { name: 'Ajustes' })).toBeVisible();
-  // Long enough for unsliced fruit to fall three times if the round kept running.
+  // Long enough for unsliced fruit to fall five times if the round kept running.
   await page.waitForTimeout(8_000);
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Ajustes' })).toBeHidden();
-  await expect(page.getByText('3 de 3')).toBeAttached();
+  await expect(page.getByText('5 de 5')).toBeAttached();
   await expect(page.getByRole('heading', { name: 'Fim de jogo' })).toHaveCount(0);
 });

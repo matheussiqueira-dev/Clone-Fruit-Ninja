@@ -54,7 +54,8 @@ export interface Fruit {
   vy: number;
   radius: number;
   kind: ArtKind;
-  type: 'fruit' | 'bomb';
+  // 'life' is the heart that gives back one life when sliced.
+  type: 'fruit' | 'bomb' | 'life';
   rotation: number;
   rotationSpeed: number;
   // Physics time multiplier: grows with the score to speed up the arc.

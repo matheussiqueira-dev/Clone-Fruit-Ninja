@@ -1,6 +1,7 @@
 import { useEffect, type MutableRefObject } from 'react';
 import { InputMode, VisionResult } from '../types';
 import { getLoadedVision, loadVision } from '../services/visionLoader';
+import { HAND_LOST_GRACE_MS, createPointFilter, mapCoverPoint } from '../lib/handFilter';
 
 interface HandTrackingParams {
   enabled: boolean;
@@ -28,6 +29,8 @@ export const useHandTracking = ({
     let videoFrameOwner: HTMLVideoElement | null = null;
     let cancelled = false;
     let detectHands: NonNullable<ReturnType<typeof getLoadedVision>>['detectHands'] | null = null;
+    const tipFilter = createPointFilter();
+    let lastSeenAt = -Infinity;
 
     const processFrame = () => {
       if (cancelled || !detectHands) return;
@@ -35,8 +38,18 @@ export const useHandTracking = ({
       const video = videoRef.current;
       if (video) {
         const result = detectHands(video, { mirror });
-        if (result !== undefined) {
-          handPositionRef.current = result ?? null;
+        const now = performance.now();
+        if (result) {
+          const frame = { width: video.videoWidth, height: video.videoHeight };
+          const stage = { width: video.clientWidth, height: video.clientHeight };
+          const landmarks = result.landmarks?.map((point) => mapCoverPoint(point, frame, stage));
+          const tip = tipFilter.filter(mapCoverPoint(result, frame, stage), now);
+          handPositionRef.current = { x: tip.x, y: tip.y, landmarks };
+          lastSeenAt = now;
+        } else if (result === null && now - lastSeenAt > HAND_LOST_GRACE_MS) {
+          // Gone for longer than a blurred frame or two: the next sighting starts a new stroke.
+          handPositionRef.current = null;
+          tipFilter.reset();
         }
       }
 

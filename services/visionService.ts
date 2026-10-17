@@ -8,6 +8,16 @@ const HAND_MODEL_PATH = `${BASE_URL}vision/models/hand_landmarker.task`;
 let handLandmarker: HandLandmarker | undefined;
 let lastVideoTime = -1;
 
+// Lower thresholds than the defaults: a fast swipe blurs the hand, and dropping it mid-swipe is what
+// made slicing feel unresponsive. The fingertip filter (lib/handFilter) absorbs the extra noise.
+const HAND_OPTIONS = {
+  runningMode: 'VIDEO',
+  numHands: 1,
+  minHandDetectionConfidence: 0.5,
+  minHandPresenceConfidence: 0.45,
+  minTrackingConfidence: 0.4
+} as const;
+
 export const initializeVision = async (): Promise<void> => {
   if (handLandmarker) return;
 
@@ -19,10 +29,7 @@ export const initializeVision = async (): Promise<void> => {
           modelAssetPath: HAND_MODEL_PATH,
           delegate: 'GPU'
         },
-        runningMode: 'VIDEO',
-        numHands: 1,
-        minHandDetectionConfidence: 0.6,
-        minTrackingConfidence: 0.6
+        ...HAND_OPTIONS
       });
     } catch (gpuError) {
       console.warn('GPU delegate failed, falling back to CPU.', gpuError);
@@ -31,10 +38,7 @@ export const initializeVision = async (): Promise<void> => {
           modelAssetPath: HAND_MODEL_PATH,
           delegate: 'CPU'
         },
-        runningMode: 'VIDEO',
-        numHands: 1,
-        minHandDetectionConfidence: 0.6,
-        minTrackingConfidence: 0.6
+        ...HAND_OPTIONS
       });
     }
   } catch (error) {

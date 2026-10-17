@@ -9,7 +9,7 @@ Shadow Dojo é um jogo de corte no navegador, inspirado em Fruit Ninja (sem afil
 - **a ponta do indicador diante da webcam**, rastreada no próprio navegador pelo HandLandmarker do MediaPipe (o vídeo nunca sai do aparelho);
 - **o mouse ou o dedo** em telas de toque, sem câmera.
 
-Regras: só um movimento corta (cursor parado não corta), cortes rápidos formam combos de até x5, uma bomba ou três frutas no chão encerram a partida.
+Regras: só um movimento corta (cursor parado não corta), cortes rápidos formam combos de até x5, cinco vidas: cada fruta no chão ou bomba cortada tira uma, o coração devolve uma.
 
 Recursos de produto:
 
