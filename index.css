@@ -1,6 +1,14 @@
 @import './styles/ms-tokens.css' layer(base);
 
-@import 'tailwindcss';
+/*
+  Classes only come from the markup. Automatic detection would also read the Markdown docs (which
+  quote class names) and any local git worktree under .claude, shipping CSS nobody uses.
+*/
+@import 'tailwindcss' source(none);
+@source './index.html';
+@source './index.tsx';
+@source './App.tsx';
+@source './components';
 
 /*
   Tailwind 4 theme mapped to the shared ms-tokens.css v1.0 (padrao-projetos, Appendix A.3).

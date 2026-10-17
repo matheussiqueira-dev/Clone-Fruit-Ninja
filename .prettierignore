@@ -9,3 +9,5 @@ package-lock.json
 styles/ms-tokens.css
 # Prose is written by hand; Prettier formats code and config only.
 *.md
+# Local editor state, including git worktrees with a full copy of the repo.
+.claude

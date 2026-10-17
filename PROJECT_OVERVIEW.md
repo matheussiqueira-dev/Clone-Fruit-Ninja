@@ -157,12 +157,12 @@ O projeto já tinha sido modernizado nas versões 0.1 e 0.2. Este ciclo tratou d
 
 | Indicador | Valor |
 |---|---|
-| Testes unitários | 78 em 12 arquivos |
-| Testes de ponta a ponta | 27 (Playwright, com axe em 320, 768 e 1280 px), todos sob a CSP de produção |
-| Cobertura do domínio | 81,9% das instruções, 84,7% das linhas (piso no CI: 80%) |
+| Testes unitários | 91 em 13 arquivos |
+| Testes de ponta a ponta | 29 (Playwright, com axe em 320, 768 e 1280 px, e uso offline), todos sob a CSP de produção |
+| Cobertura do domínio | 85,3% das instruções, 88,0% das linhas (piso no CI: 80%) |
 | Erros de tipo / lint | 0 / 0 |
 | `npm audit` | 0 alertas |
-| JS inicial | 284 KB (90 KB gzip); visão computacional em chunk separado de 155 KB (46 KB gzip), só no modo câmera |
+| JS inicial | 290 KB (92 KB gzip); visão computacional em chunk separado de 155 KB (46 KB gzip), só no modo câmera |
 | Build de produção | menos de 1 s |
 
 ## 7. Rodar e verificar

@@ -134,7 +134,8 @@ export default defineConfig({
   },
   test: {
     // server/dist holds compiled copies of the server code (npm run build:server).
-    exclude: [...configDefaults.exclude, 'server/dist/**', 'e2e/**'],
+    // .claude/worktrees holds full copies of the repo (local git worktrees): never collect their tests.
+    exclude: [...configDefaults.exclude, 'server/dist/**', 'e2e/**', '.claude/**'],
     coverage: {
       provider: 'v8',
       // The pure domain: engine, rules, history, sharing, leaderboard and the ranking server.

@@ -59,7 +59,7 @@ Versões conferidas no npm em 17/10/2026. Nenhuma tem custo.
 
 | Biblioteca | Para quê | Licença | Compatibilidade verificada |
 |---|---|---|---|
-| `vite-plugin-pwa` 2.0 (Workbox) | App instalável e offline; cache do modelo de 7,8 MB e do WASM de 13,5 MB entre visitas | MIT | aceita Vite 8 |
+| `vite-plugin-pwa` 2.0 (Workbox) | App instalável e offline; cache do modelo de 7,8 MB e do WASM de 13,5 MB entre visitas | MIT | aceita Vite 8; **já em uso** |
 | `web-vitals` 6 | LCP, INP e CLS reais dos jogadores, enviados ao relatório central | Apache-2.0 | sem dependências |
 | `comlink` 4 | Rodar o MediaPipe num Web Worker sem escrever o protocolo de mensagens à mão | Apache-2.0 | sem dependências |
 | `zod` 4 | Esquema único para validar envios de ranking no servidor e no cliente | MIT | sem dependências |
@@ -75,7 +75,7 @@ Ordenado por retorno sobre esforço. Os guias de implementação estão em [`MAS
 | Prioridade | Item | Esforço | Por quê |
 |---|---|---|---|
 | 1 | Publicar v0.3.0 (release desta fase) | baixo | O deploy ainda roda Tailwind 3 / Vite 6 / MediaPipe 0.10 |
-| 2 | PWA com cache do modelo | baixo | Segunda visita do modo câmera sem baixar 21 MB de novo |
+| 2 | ~~PWA com cache do modelo~~ (entregue em 17/10/2026) | baixo | Segunda visita do modo câmera sem baixar 21 MB de novo |
 | 3 | Visão em Web Worker | médio | Libera a thread principal: o laço do jogo deixa de disputar CPU com a inferência |
 | 4 | Ranking do desafio com validação por replay | alto | Transforma o desafio diário em competição real e impede pontuação forjada |
 | 5 | Telemetria (erros + Web Vitals) | baixo | Falhas de câmera e modelo variam por aparelho |

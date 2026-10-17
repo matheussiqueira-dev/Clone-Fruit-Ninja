@@ -10,8 +10,8 @@ Documento executivo: de onde o projeto partiu, onde está, o que mudar na arquit
 |---|---|---|---|
 | Erros de tipo em `strict` | 376 escondidos (`strict` desligado) | 0 | 0 |
 | Lint | inexistente | inexistente | ESLint com tipos, 0 problemas |
-| Testes unitários | 3 arquivos, sem CI | 73 | 78, cobertura de 82% do domínio com piso no CI |
-| Testes de ponta a ponta | 0 | 26 | 27, todos sob a CSP de produção |
+| Testes unitários | 3 arquivos, sem CI | 73 | 91, cobertura de 85% do domínio com piso no CI |
+| Testes de ponta a ponta | 0 | 26 | 29, todos sob a CSP de produção, incluindo uso offline |
 | `npm audit` | alertas em Express, Vite e PostCSS | 0 críticos, 5 altos (Tailwind 3) | 0 alertas |
 | Build | Vite 6 | Vite 6, 3,7 s | Vite 8 (Rolldown), 0,75 s |
 | Estilo | Tailwind 3, cores soltas | Tailwind 3 + design system | Tailwind 4 + design system, sem PostCSS |
@@ -59,7 +59,9 @@ Hoje a inferência roda na thread principal, no mesmo quadro que a física e o d
 
 ## 3. Guias táticos das features sugeridas
 
-### 3.1 PWA com cache do modelo
+### 3.1 PWA com cache do modelo (entregue)
+
+> Implementado em `vite.config.ts` e coberto por `e2e/offline.spec.ts`. O cache leva a versão instalada do MediaPipe no nome (`vision-assets-<versão>`) e um script no service worker apaga os caches de versões anteriores na ativação. O guia abaixo fica como registro do desenho.
 
 **Objetivo.** Na segunda visita, o modo câmera abre sem baixar de novo os 21 MB do modelo e do WASM.
 

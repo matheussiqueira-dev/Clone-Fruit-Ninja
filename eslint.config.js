@@ -8,7 +8,16 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['dist', 'server/dist', 'coverage', 'test-results', 'playwright-report', 'public/vision']
+    // .claude holds local editor state, including git worktrees with a full copy of the repo.
+    ignores: [
+      'dist',
+      'server/dist',
+      'coverage',
+      'test-results',
+      'playwright-report',
+      'public/vision',
+      '.claude'
+    ]
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
