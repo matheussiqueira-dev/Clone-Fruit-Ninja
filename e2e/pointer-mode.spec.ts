@@ -88,7 +88,9 @@ test('swiping slices fruit and the result is saved in this browser', async ({ pa
   await expect(page.getByRole('listitem').filter({ hasText: 'Playwright' })).toBeVisible();
 });
 
-test('a one-letter name asks for at least two characters and a saved result cannot be saved twice', async ({ page }) => {
+test('a one-letter name asks for at least two characters and a saved result cannot be saved twice', async ({
+  page
+}) => {
   await startPointerGame(page);
   const stage = await stageBox(page);
   await page.mouse.move(stage.x + 2, stage.y + 2);

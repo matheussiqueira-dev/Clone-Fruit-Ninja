@@ -35,7 +35,11 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
             <p className="text-caption text-fg-secondary">
               Um erro inesperado interrompeu a página. Seus resultados salvos continuam neste navegador.
             </p>
-            <button type="button" className="ms-btn ms-btn--primary mt-3" onClick={() => window.location.reload()}>
+            <button
+              type="button"
+              className="ms-btn ms-btn--primary mt-3"
+              onClick={() => window.location.reload()}
+            >
               Recarregar
             </button>
           </div>

@@ -4,12 +4,27 @@ import { Fruit } from '../../types';
 import { EngineState, FlyingHalf, SPLAT_LIFETIME } from '../../lib/engine/gameEngine';
 
 const HAND_CONNECTIONS: Array<[number, number]> = [
-  [0,1],[1,2],[2,3],[3,4],
-  [0,5],[5,6],[6,7],[7,8],
-  [5,9],[9,10],[10,11],[11,12],
-  [9,13],[13,14],[14,15],[15,16],
-  [13,17],[17,18],[18,19],[19,20],
-  [0,17]
+  [0, 1],
+  [1, 2],
+  [2, 3],
+  [3, 4],
+  [0, 5],
+  [5, 6],
+  [6, 7],
+  [7, 8],
+  [5, 9],
+  [9, 10],
+  [10, 11],
+  [11, 12],
+  [9, 13],
+  [13, 14],
+  [14, 15],
+  [15, 16],
+  [13, 17],
+  [17, 18],
+  [18, 19],
+  [19, 20],
+  [0, 17]
 ];
 
 const drawFruit = (ctx: CanvasRenderingContext2D, fruit: Fruit) => {
@@ -92,7 +107,12 @@ const drawHalf = (ctx: CanvasRenderingContext2D, half: FlyingHalf) => {
 };
 
 // Brush stroke: thin at the tail, full width at the tip, and thinner the faster the swipe.
-const drawBlade = (ctx: CanvasRenderingContext2D, trail: Array<{ x: number; y: number }>, color: string, maxWidth: number) => {
+const drawBlade = (
+  ctx: CanvasRenderingContext2D,
+  trail: Array<{ x: number; y: number }>,
+  color: string,
+  maxWidth: number
+) => {
   ctx.save();
   ctx.strokeStyle = color;
   ctx.lineCap = 'round';

@@ -191,7 +191,13 @@ export const createGameEngine = (options: EngineOptions): GameEngine => {
     return active;
   };
 
-  const sliceFruit = (fruit: Fruit, index: number, cutDx: number, cutDy: number, now: number): Partial<GameStats> => {
+  const sliceFruit = (
+    fruit: Fruit,
+    index: number,
+    cutDx: number,
+    cutDy: number,
+    now: number
+  ): Partial<GameStats> => {
     const kind = fruit.kind as FruitKind;
     fruit.sliced = true;
     splitAlongCut(fruit, cutDx, cutDy, 220).forEach((half) => {

@@ -19,7 +19,9 @@ describe('resolveLeaderboardApiUrl', () => {
   });
 
   it('prefers a configured API URL and drops the trailing slash', () => {
-    expect(resolveLeaderboardApiUrl(' https://api.example.dev/v1/ ', 'localhost')).toBe('https://api.example.dev/v1');
+    expect(resolveLeaderboardApiUrl(' https://api.example.dev/v1/ ', 'localhost')).toBe(
+      'https://api.example.dev/v1'
+    );
   });
 
   it('ignores non-string configuration values', () => {

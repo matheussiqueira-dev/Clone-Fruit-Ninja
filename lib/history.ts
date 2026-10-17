@@ -29,20 +29,26 @@ const isFiniteNonNegative = (value: unknown): value is number =>
 // Storage is user-controlled: keep only well-formed records instead of trusting the shape.
 export const normalizeHistory = (raw: unknown): RunRecord[] => {
   if (!Array.isArray(raw)) return [];
-  return raw.filter((item): item is RunRecord => {
-    if (!item || typeof item !== 'object') return false;
-    const r = item as Record<string, unknown>;
-    return typeof r.id === 'string'
-      && typeof r.at === 'string' && !Number.isNaN(Date.parse(r.at))
-      && isFiniteNonNegative(r.score)
-      && isFiniteNonNegative(r.accuracy) && r.accuracy <= 100
-      && isFiniteNonNegative(r.maxCombo)
-      && isFiniteNonNegative(r.sliced)
-      && isFiniteNonNegative(r.missed)
-      && (r.inputMode === 'camera' || r.inputMode === 'pointer')
-      && (r.mode === 'free' || (r.mode === 'daily' && isDayKey(r.day)))
-      && (r.reason === 'bomb' || r.reason === 'lives');
-  }).slice(-HISTORY_LIMIT);
+  return raw
+    .filter((item): item is RunRecord => {
+      if (!item || typeof item !== 'object') return false;
+      const r = item as Record<string, unknown>;
+      return (
+        typeof r.id === 'string' &&
+        typeof r.at === 'string' &&
+        !Number.isNaN(Date.parse(r.at)) &&
+        isFiniteNonNegative(r.score) &&
+        isFiniteNonNegative(r.accuracy) &&
+        r.accuracy <= 100 &&
+        isFiniteNonNegative(r.maxCombo) &&
+        isFiniteNonNegative(r.sliced) &&
+        isFiniteNonNegative(r.missed) &&
+        (r.inputMode === 'camera' || r.inputMode === 'pointer') &&
+        (r.mode === 'free' || (r.mode === 'daily' && isDayKey(r.day))) &&
+        (r.reason === 'bomb' || r.reason === 'lives')
+      );
+    })
+    .slice(-HISTORY_LIMIT);
 };
 
 // Newest last; the oldest records drop off past the limit.
@@ -65,7 +71,8 @@ export interface HistorySummary {
   trend: number | null;
 }
 
-const average = (values: number[]) => (values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : 0);
+const average = (values: number[]) =>
+  values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : 0;
 
 export const summarizeHistory = (history: RunRecord[], window = 5): HistorySummary => {
   const scores = history.map((run) => run.score);

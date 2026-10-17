@@ -37,17 +37,20 @@ export const useLeaderboard = (): UseLeaderboardResult => {
     }
   }, [scope]);
 
-  const submit = useCallback(async (payload: LeaderboardSubmission) => {
-    setSubmitting(true);
-    try {
-      const result = await submitLeaderboardScore(payload);
-      setEntries(result.entries.slice(0, LEADERBOARD_LIMIT));
-      setRemoteUnavailable(scope === 'remote' && result.source === 'local');
-      return result.source;
-    } finally {
-      setSubmitting(false);
-    }
-  }, [scope]);
+  const submit = useCallback(
+    async (payload: LeaderboardSubmission) => {
+      setSubmitting(true);
+      try {
+        const result = await submitLeaderboardScore(payload);
+        setEntries(result.entries.slice(0, LEADERBOARD_LIMIT));
+        setRemoteUnavailable(scope === 'remote' && result.source === 'local');
+        return result.source;
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [scope]
+  );
 
   // First load: loading already starts true, so only the result is set, and a late answer after
   // unmount (or a scope change) is dropped.

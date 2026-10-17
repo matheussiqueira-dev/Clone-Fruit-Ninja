@@ -72,9 +72,10 @@ export const normalizeLeaderboardEntries = (entries: unknown): LeaderboardEntry[
     if (!isValidLeaderboardSubmission(candidate)) return;
 
     const id = typeof candidate.id === 'string' && candidate.id.trim() ? candidate.id : createId();
-    const createdAt = typeof candidate.createdAt === 'string' && candidate.createdAt.trim()
-      ? candidate.createdAt
-      : new Date().toISOString();
+    const createdAt =
+      typeof candidate.createdAt === 'string' && candidate.createdAt.trim()
+        ? candidate.createdAt
+        : new Date().toISOString();
 
     normalized.push({
       id,

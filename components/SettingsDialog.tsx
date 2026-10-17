@@ -14,9 +14,21 @@ interface SettingsDialogProps {
 }
 
 const SETTING_ROWS: Array<{ key: SettingKey; label: string; description: string }> = [
-  { key: 'mirrorVideo', label: 'Espelhar a câmera', description: 'O movimento na tela segue o seu, como num espelho.' },
-  { key: 'showCameraFeed', label: 'Mostrar o vídeo', description: 'Exibe a câmera ao fundo durante a partida.' },
-  { key: 'showHandSkeleton', label: 'Mostrar a mão', description: 'Desenha os pontos da mão para conferir o rastreamento.' },
+  {
+    key: 'mirrorVideo',
+    label: 'Espelhar a câmera',
+    description: 'O movimento na tela segue o seu, como num espelho.'
+  },
+  {
+    key: 'showCameraFeed',
+    label: 'Mostrar o vídeo',
+    description: 'Exibe a câmera ao fundo durante a partida.'
+  },
+  {
+    key: 'showHandSkeleton',
+    label: 'Mostrar a mão',
+    description: 'Desenha os pontos da mão para conferir o rastreamento.'
+  },
   { key: 'showTrail', label: 'Rastro da lâmina', description: 'Mostra o traço do corte.' },
   { key: 'lowVfx', label: 'Efeitos reduzidos', description: 'Sem gotas de suco e com rastro mais curto.' }
 ];
@@ -48,8 +60,16 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, settings, lockedO
   return (
     <dialog ref={dialogRef} className="ms-dialog" aria-labelledby={titleId} onClose={handleClose}>
       <div className="flex items-start justify-between gap-4">
-        <h2 id={titleId} className="text-h2 text-fg">Ajustes</h2>
-        <button type="button" className="ms-btn ms-btn--ghost ms-btn--icon -mr-2 -mt-2" onClick={() => dialogRef.current?.close()} aria-label="Fechar ajustes" title="Fechar ajustes">
+        <h2 id={titleId} className="text-h2 text-fg">
+          Ajustes
+        </h2>
+        <button
+          type="button"
+          className="ms-btn ms-btn--ghost ms-btn--icon -mr-2 -mt-2"
+          onClick={() => dialogRef.current?.close()}
+          aria-label="Fechar ajustes"
+          title="Fechar ajustes"
+        >
           <X size={20} strokeWidth={1.75} aria-hidden="true" />
         </button>
       </div>
@@ -73,11 +93,15 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, settings, lockedO
                   <span className="block text-small font-semibold text-fg">{label}</span>
                   <span className="block text-caption text-fg-secondary">{description}</span>
                   {locked && (
-                    <span className="block text-caption text-fg-secondary">Mantido pelo movimento reduzido do sistema.</span>
+                    <span className="block text-caption text-fg-secondary">
+                      Mantido pelo movimento reduzido do sistema.
+                    </span>
                   )}
                 </span>
                 <span className="flex flex-shrink-0 items-center gap-3">
-                  <span className="text-caption text-fg-secondary" aria-hidden="true">{checked ? 'Ativo' : 'Inativo'}</span>
+                  <span className="text-caption text-fg-secondary" aria-hidden="true">
+                    {checked ? 'Ativo' : 'Inativo'}
+                  </span>
                   <span className="ms-switch__track" aria-hidden="true">
                     <span className="ms-switch__thumb" />
                   </span>

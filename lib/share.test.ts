@@ -25,7 +25,9 @@ describe('readChallengeDay', () => {
 describe('buildShareUrl', () => {
   it('links to the home page, with the challenge day when there is one', () => {
     expect(buildShareUrl('https://shadow-dojo.vercel.app')).toBe('https://shadow-dojo.vercel.app/');
-    expect(buildShareUrl('https://shadow-dojo.vercel.app', TODAY)).toBe('https://shadow-dojo.vercel.app/?desafio=2026-10-15');
+    expect(buildShareUrl('https://shadow-dojo.vercel.app', TODAY)).toBe(
+      'https://shadow-dojo.vercel.app/?desafio=2026-10-15'
+    );
   });
 
   it('ignores an invalid day', () => {
@@ -35,13 +37,15 @@ describe('buildShareUrl', () => {
 
 describe('buildShareText', () => {
   it('describes a free run', () => {
-    expect(buildShareText({ score: 1420, accuracy: 87, maxCombo: 5 }))
-      .toBe('Fiz 1.420 pontos no Shadow Dojo (87% de precisão, combo x5). Consegue me vencer?');
+    expect(buildShareText({ score: 1420, accuracy: 87, maxCombo: 5 })).toBe(
+      'Fiz 1.420 pontos no Shadow Dojo (87% de precisão, combo x5). Consegue me vencer?'
+    );
   });
 
   it('names the challenge day and never shows combo below x1', () => {
-    expect(buildShareText({ score: 0, accuracy: 0, maxCombo: 0, day: TODAY }))
-      .toBe('Fiz 0 pontos no desafio de 15/10 do Shadow Dojo (0% de precisão, combo x1). Consegue passar?');
+    expect(buildShareText({ score: 0, accuracy: 0, maxCombo: 0, day: TODAY })).toBe(
+      'Fiz 0 pontos no desafio de 15/10 do Shadow Dojo (0% de precisão, combo x1). Consegue passar?'
+    );
   });
 
   it('formats short day labels', () => {

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { appendRun, bestForDay, describeTrend, normalizeHistory, RunRecord, summarizeHistory } from './history';
+import {
+  appendRun,
+  bestForDay,
+  describeTrend,
+  normalizeHistory,
+  RunRecord,
+  summarizeHistory
+} from './history';
 
 const run = (score: number, overrides: Partial<RunRecord> = {}): RunRecord => ({
   id: `r-${score}-${Math.random()}`,
@@ -20,18 +27,20 @@ describe('normalizeHistory', () => {
     const good = run(10);
     const daily = run(20, { mode: 'daily', day: '2026-10-15' });
     expect(normalizeHistory([good, daily])).toEqual([good, daily]);
-    expect(normalizeHistory([
-      good,
-      { ...good, score: -1 },
-      { ...good, accuracy: 120 },
-      { ...good, at: 'ontem' },
-      { ...good, inputMode: 'joystick' },
-      { ...good, mode: 'daily' },
-      { ...good, mode: 'daily', day: '15/10/2026' },
-      { ...good, score: Number.NaN },
-      null,
-      'texto'
-    ])).toEqual([good]);
+    expect(
+      normalizeHistory([
+        good,
+        { ...good, score: -1 },
+        { ...good, accuracy: 120 },
+        { ...good, at: 'ontem' },
+        { ...good, inputMode: 'joystick' },
+        { ...good, mode: 'daily' },
+        { ...good, mode: 'daily', day: '15/10/2026' },
+        { ...good, score: Number.NaN },
+        null,
+        'texto'
+      ])
+    ).toEqual([good]);
   });
 
   it('returns an empty list for non-array storage', () => {
@@ -67,7 +76,14 @@ describe('bestForDay', () => {
 describe('summarizeHistory and describeTrend', () => {
   it('summarizes an empty history', () => {
     const summary = summarizeHistory([]);
-    expect(summary).toEqual({ runs: 0, best: 0, averageScore: 0, averageAccuracy: 0, bestCombo: 0, trend: null });
+    expect(summary).toEqual({
+      runs: 0,
+      best: 0,
+      averageScore: 0,
+      averageAccuracy: 0,
+      bestCombo: 0,
+      trend: null
+    });
     expect(describeTrend(summary)).toBe('Nenhuma partida ainda');
   });
 
@@ -94,7 +110,10 @@ describe('summarizeHistory and describeTrend', () => {
   });
 
   it('computes best, averages and best combo', () => {
-    const summary = summarizeHistory([run(10, { accuracy: 50, maxCombo: 3 }), run(30, { accuracy: 100, maxCombo: 5 })]);
+    const summary = summarizeHistory([
+      run(10, { accuracy: 50, maxCombo: 3 }),
+      run(30, { accuracy: 100, maxCombo: 5 })
+    ]);
     expect(summary).toMatchObject({ runs: 2, best: 30, averageScore: 20, averageAccuracy: 75, bestCombo: 5 });
   });
 });

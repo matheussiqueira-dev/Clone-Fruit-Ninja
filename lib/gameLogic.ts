@@ -74,9 +74,7 @@ export const updateComboOnSlice = ({
   maxComboMultiplier?: number;
 }): ComboUpdateResult => {
   const timeSince = (now - lastSliceTime) / 1000;
-  const nextCombo = timeSince <= windowSeconds
-    ? Math.min(maxComboMultiplier, combo + 1)
-    : 1;
+  const nextCombo = timeSince <= windowSeconds ? Math.min(maxComboMultiplier, combo + 1) : 1;
   const nextMaxCombo = Math.max(maxCombo, nextCombo);
   return {
     combo: nextCombo,
@@ -86,11 +84,8 @@ export const updateComboOnSlice = ({
   };
 };
 
-export const shouldResetCombo = (
-  now: number,
-  lastSliceTime: number,
-  timeoutSeconds = COMBO_TIMEOUT
-) => now - lastSliceTime > timeoutSeconds * 1000;
+export const shouldResetCombo = (now: number, lastSliceTime: number, timeoutSeconds = COMBO_TIMEOUT) =>
+  now - lastSliceTime > timeoutSeconds * 1000;
 
 export const applyMiss = (lives: number) => {
   const safeLives = Number.isFinite(lives) ? Math.max(0, Math.floor(lives)) : 0;

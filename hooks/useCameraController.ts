@@ -16,24 +16,25 @@ interface CameraController {
 }
 
 // Resolves once the video has a frame; rejects with a TimeoutError if the device never delivers one.
-const waitForVideoData = (video: HTMLVideoElement) => new Promise<void>((resolve, reject) => {
-  if (video.readyState >= 2) {
-    resolve();
-    return;
-  }
+const waitForVideoData = (video: HTMLVideoElement) =>
+  new Promise<void>((resolve, reject) => {
+    if (video.readyState >= 2) {
+      resolve();
+      return;
+    }
 
-  const timeout = window.setTimeout(() => {
-    video.removeEventListener('loadeddata', onLoaded);
-    reject(new DOMException('Video did not start in time.', 'TimeoutError'));
-  }, VIDEO_START_TIMEOUT_MS);
+    const timeout = window.setTimeout(() => {
+      video.removeEventListener('loadeddata', onLoaded);
+      reject(new DOMException('Video did not start in time.', 'TimeoutError'));
+    }, VIDEO_START_TIMEOUT_MS);
 
-  function onLoaded() {
-    window.clearTimeout(timeout);
-    resolve();
-  }
+    function onLoaded() {
+      window.clearTimeout(timeout);
+      resolve();
+    }
 
-  video.addEventListener('loadeddata', onLoaded, { once: true });
-});
+    video.addEventListener('loadeddata', onLoaded, { once: true });
+  });
 
 export const useCameraController = (): CameraController => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -58,11 +59,14 @@ export const useCameraController = (): CameraController => {
     setCameraFailure(null);
   }, [stopCamera]);
 
-  const fail = useCallback((failure: CameraFailure) => {
-    stopCamera();
-    setCameraFailure(failure);
-    setCameraStatus('error');
-  }, [stopCamera]);
+  const fail = useCallback(
+    (failure: CameraFailure) => {
+      stopCamera();
+      setCameraFailure(failure);
+      setCameraStatus('error');
+    },
+    [stopCamera]
+  );
 
   const prepareCamera = useCallback(async () => {
     if (isCameraBusy(cameraStatus)) return false;

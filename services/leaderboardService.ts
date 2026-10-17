@@ -1,10 +1,5 @@
 import { STORAGE_KEYS } from '../config/gameConfig';
-import {
-  LeaderboardEntry,
-  LeaderboardResult,
-  LeaderboardScope,
-  LeaderboardSubmission
-} from '../types';
+import { LeaderboardEntry, LeaderboardResult, LeaderboardScope, LeaderboardSubmission } from '../types';
 import {
   isValidLeaderboardSubmission,
   normalizeLeaderboardEntries,
@@ -28,10 +23,11 @@ export const resolveLeaderboardApiUrl = (envValue: unknown, hostname: string | u
   return null;
 };
 
-const getBaseApiUrl = () => resolveLeaderboardApiUrl(
-  import.meta.env.VITE_LEADERBOARD_API_URL,
-  typeof window !== 'undefined' ? window.location.hostname : undefined
-);
+const getBaseApiUrl = () =>
+  resolveLeaderboardApiUrl(
+    import.meta.env.VITE_LEADERBOARD_API_URL,
+    typeof window !== 'undefined' ? window.location.hostname : undefined
+  );
 
 export const getLeaderboardScope = (): LeaderboardScope => (getBaseApiUrl() ? 'remote' : 'local');
 
@@ -97,9 +93,10 @@ const mergeLocalWithRemote = (remote: LeaderboardEntry[]) => {
 };
 
 const createLocalEntry = (payload: LeaderboardSubmission): LeaderboardEntry => ({
-  id: typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  id:
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
   createdAt: new Date().toISOString(),
   ...payload
 });

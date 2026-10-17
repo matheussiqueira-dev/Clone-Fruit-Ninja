@@ -10,7 +10,7 @@ const VISION_WASM_FILES = [
   'vision_wasm_internal.js',
   'vision_wasm_internal.wasm',
   'vision_wasm_nosimd_internal.js',
-  'vision_wasm_nosimd_internal.wasm',
+  'vision_wasm_nosimd_internal.wasm'
 ];
 
 // The package's exports map hides package.json, so resolve it from the project root.

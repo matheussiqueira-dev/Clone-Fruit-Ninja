@@ -37,10 +37,13 @@ const ScoreChart: React.FC<ScoreChartProps> = ({ runs, label }) => {
   const maxY = niceMax(Math.max(...runs.map((run) => run.score), 1));
   const plotW = chartWidth - PAD.left - PAD.right;
   const plotH = HEIGHT - PAD.top - PAD.bottom;
-  const x = (index: number) => PAD.left + (runs.length === 1 ? plotW / 2 : (index / (runs.length - 1)) * plotW);
+  const x = (index: number) =>
+    PAD.left + (runs.length === 1 ? plotW / 2 : (index / (runs.length - 1)) * plotW);
   const y = (score: number) => PAD.top + plotH - (score / maxY) * plotH;
   const ticks = [0, maxY / 2, maxY];
-  const path = runs.map((run, index) => `${index === 0 ? 'M' : 'L'}${x(index).toFixed(1)},${y(run.score).toFixed(1)}`).join(' ');
+  const path = runs
+    .map((run, index) => `${index === 0 ? 'M' : 'L'}${x(index).toFixed(1)},${y(run.score).toFixed(1)}`)
+    .join(' ');
   const activeRun = active === null ? null : runs[active];
 
   const handleKey = (event: React.KeyboardEvent<SVGSVGElement>) => {
@@ -92,39 +95,84 @@ const ScoreChart: React.FC<ScoreChartProps> = ({ runs, label }) => {
               stroke={tick === 0 ? 'var(--ms-border-strong)' : 'var(--ms-chart-grid)'}
               strokeWidth={1}
             />
-            <text x={PAD.left - 8} y={y(tick) + 4} textAnchor="end" fontSize={12} fill="var(--ms-chart-axis)" className="ms-num">
+            <text
+              x={PAD.left - 8}
+              y={y(tick) + 4}
+              textAnchor="end"
+              fontSize={12}
+              fill="var(--ms-chart-axis)"
+              className="ms-num"
+            >
               {formatInteger(tick)}
             </text>
           </g>
         ))}
-        <text x={PAD.left} y={HEIGHT - 8} fontSize={12} fill="var(--ms-chart-axis)">1ª</text>
+        <text x={PAD.left} y={HEIGHT - 8} fontSize={12} fill="var(--ms-chart-axis)">
+          1ª
+        </text>
         {runs.length > 1 && (
-          <text x={chartWidth - PAD.right} y={HEIGHT - 8} textAnchor="end" fontSize={12} fill="var(--ms-chart-axis)">
+          <text
+            x={chartWidth - PAD.right}
+            y={HEIGHT - 8}
+            textAnchor="end"
+            fontSize={12}
+            fill="var(--ms-chart-axis)"
+          >
             {runs.length}ª partida
           </text>
         )}
 
         {activeRun && active !== null && (
-          <line x1={x(active)} x2={x(active)} y1={PAD.top} y2={PAD.top + plotH} stroke="var(--ms-chart-crosshair)" strokeWidth={1} />
+          <line
+            x1={x(active)}
+            x2={x(active)}
+            y1={PAD.top}
+            y2={PAD.top + plotH}
+            stroke="var(--ms-chart-crosshair)"
+            strokeWidth={1}
+          />
         )}
-        <path d={path} fill="none" stroke="var(--ms-chart-1)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+        <path
+          d={path}
+          fill="none"
+          stroke="var(--ms-chart-1)"
+          strokeWidth={2}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
         {runs.length === 1 && <circle cx={x(0)} cy={y(runs[0].score)} r={4} fill="var(--ms-chart-1)" />}
         {activeRun && active !== null && (
-          <circle cx={x(active)} cy={y(activeRun.score)} r={5} fill="var(--ms-chart-1)" stroke="var(--ms-surface)" strokeWidth={2} />
+          <circle
+            cx={x(active)}
+            cy={y(activeRun.score)}
+            r={5}
+            fill="var(--ms-chart-1)"
+            stroke="var(--ms-surface)"
+            strokeWidth={2}
+          />
         )}
       </svg>
 
-      <p id={descriptionId} className="ms-sr-only">Use as setas para percorrer as partidas.</p>
-      <p className="ms-sr-only" aria-live="polite">{activeRun && active !== null ? runLabel(active, activeRun) : ''}</p>
+      <p id={descriptionId} className="ms-sr-only">
+        Use as setas para percorrer as partidas.
+      </p>
+      <p className="ms-sr-only" aria-live="polite">
+        {activeRun && active !== null ? runLabel(active, activeRun) : ''}
+      </p>
 
       {activeRun && active !== null && (
         <div
           className="pointer-events-none absolute top-0 whitespace-nowrap rounded-xs border border-line-strong bg-surface-raised px-2 py-1 text-fine text-fg shadow-md"
-          style={{ left: `${(x(active) / chartWidth) * 100}%`, transform: `translateX(${active > runs.length / 2 ? '-100%' : '0'})` }}
+          style={{
+            left: `${(x(active) / chartWidth) * 100}%`,
+            transform: `translateX(${active > runs.length / 2 ? '-100%' : '0'})`
+          }}
           aria-hidden="true"
         >
           <span className="font-semibold">Partida {active + 1}</span>
-          <span className="block ms-num">{formatInteger(activeRun.score)} pontos · {formatPercent(activeRun.accuracy)}</span>
+          <span className="block ms-num">
+            {formatInteger(activeRun.score)} pontos · {formatPercent(activeRun.accuracy)}
+          </span>
         </div>
       )}
     </div>

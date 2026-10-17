@@ -17,13 +17,7 @@ export type InputMode = 'camera' | 'pointer';
 export type CameraStatus = 'idle' | 'loading-model' | 'requesting' | 'ready' | 'error';
 
 export type CameraFailure =
-  | 'denied'
-  | 'unavailable'
-  | 'busy'
-  | 'model-error'
-  | 'unsupported'
-  | 'timeout'
-  | 'error';
+  'denied' | 'unavailable' | 'busy' | 'model-error' | 'unsupported' | 'timeout' | 'error';
 
 export type GameOverReason = 'bomb' | 'lives';
 

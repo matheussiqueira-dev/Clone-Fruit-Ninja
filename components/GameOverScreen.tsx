@@ -79,9 +79,18 @@ const GameOverScreen: React.FC<GameOverScreenProps> = ({
   const accuracy = computeAccuracy(stats.sliced, stats.missed);
 
   const handleShare = async () => {
-    const text = buildShareText({ score: stats.score, accuracy, maxCombo: stats.maxCombo, day: challengeDay ?? undefined });
+    const text = buildShareText({
+      score: stats.score,
+      accuracy,
+      maxCombo: stats.maxCombo,
+      day: challengeDay ?? undefined
+    });
     try {
-      const outcome = await shareOrCopy('Shadow Dojo', text, buildShareUrl(window.location.origin, challengeDay ?? undefined));
+      const outcome = await shareOrCopy(
+        'Shadow Dojo',
+        text,
+        buildShareUrl(window.location.origin, challengeDay ?? undefined)
+      );
       setShareState(outcome === 'copied' ? 'copied' : 'idle');
     } catch {
       setShareState('error');
@@ -107,10 +116,16 @@ const GameOverScreen: React.FC<GameOverScreenProps> = ({
 
   const saved = saveState.status === 'saved';
   const invalid = saveState.status === 'invalid';
-  const feedback = saveState.status === 'saved'
-    ? saveState.scope === 'remote' ? 'Resultado salvo no ranking.' : 'Resultado salvo neste navegador.'
-    : saveState.status === 'error' ? 'Não foi possível salvar o resultado. Tente de novo.'
-      : invalid ? `Use pelo menos ${MIN_PLAYER_LENGTH} caracteres ou deixe o campo vazio.` : '';
+  const feedback =
+    saveState.status === 'saved'
+      ? saveState.scope === 'remote'
+        ? 'Resultado salvo no ranking.'
+        : 'Resultado salvo neste navegador.'
+      : saveState.status === 'error'
+        ? 'Não foi possível salvar o resultado. Tente de novo.'
+        : invalid
+          ? `Use pelo menos ${MIN_PLAYER_LENGTH} caracteres ou deixe o campo vazio.`
+          : '';
 
   const numbers: Array<{ label: string; value: string }> = [
     { label: 'Pontuação', value: formatInteger(stats.score) },
@@ -123,12 +138,22 @@ const GameOverScreen: React.FC<GameOverScreenProps> = ({
     <div className="ms-container grid w-full max-w-[70rem] gap-6 py-6 lg:grid-cols-[3fr_2fr] lg:items-start lg:py-10">
       <section className="ms-card flex flex-col gap-6" aria-labelledby="game-over-title">
         <div className="flex flex-col gap-2">
-          <h1 id="game-over-title" className="text-h1 text-fg">Fim de jogo</h1>
-          <p className="text-lead text-fg-secondary">{REASON_TEXT[reason]} {senseiWisdom}</p>
+          <h1 id="game-over-title" className="text-h1 text-fg">
+            Fim de jogo
+          </h1>
+          <p className="text-lead text-fg-secondary">
+            {REASON_TEXT[reason]} {senseiWisdom}
+          </p>
           {challengeDay && (
             <p className="text-caption text-fg-secondary">
               Desafio de {formatDayShort(challengeDay)}
-              {dailyBest !== null && <> · seu melhor neste desafio: <span className="ms-num font-semibold text-fg">{formatInteger(dailyBest)}</span></>}
+              {dailyBest !== null && (
+                <>
+                  {' '}
+                  · seu melhor neste desafio:{' '}
+                  <span className="ms-num font-semibold text-fg">{formatInteger(dailyBest)}</span>
+                </>
+              )}
             </p>
           )}
         </div>
@@ -143,7 +168,9 @@ const GameOverScreen: React.FC<GameOverScreenProps> = ({
         </dl>
 
         <form className="flex flex-col gap-2" onSubmit={(event) => void handleSubmit(event)}>
-          <label htmlFor={nameId} className="text-small font-semibold text-fg">Nome no ranking</label>
+          <label htmlFor={nameId} className="text-small font-semibold text-fg">
+            Nome no ranking
+          </label>
           <div className="flex flex-col gap-3 sm:flex-row">
             <input
               id={nameId}
@@ -161,21 +188,31 @@ const GameOverScreen: React.FC<GameOverScreenProps> = ({
               autoComplete="nickname"
               aria-describedby={helpId}
             />
-            <button type="submit" className="ms-btn ms-btn--secondary" disabled={isSubmitting || saved} aria-busy={isSubmitting}>
+            <button
+              type="submit"
+              className="ms-btn ms-btn--secondary"
+              disabled={isSubmitting || saved}
+              aria-busy={isSubmitting}
+            >
               {isSubmitting ? 'Salvando…' : saved ? 'Resultado salvo' : 'Salvar resultado'}
             </button>
           </div>
           <p id={helpId} className="text-caption text-fg-secondary">
             De {MIN_PLAYER_LENGTH} a {MAX_PLAYER_LENGTH} caracteres. Sem nome, salvamos como "Ninja".
           </p>
-          <p className={`text-caption ${saveState.status === 'error' || invalid ? 'text-danger' : 'text-fg-secondary'}`} role="status">
+          <p
+            className={`text-caption ${saveState.status === 'error' || invalid ? 'text-danger' : 'text-fg-secondary'}`}
+            role="status"
+          >
             {feedback}
           </p>
         </form>
 
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <button type="button" className="ms-btn ms-btn--primary" onClick={onRestart}>Jogar de novo</button>
+            <button type="button" className="ms-btn ms-btn--primary" onClick={onRestart}>
+              Jogar de novo
+            </button>
             <button type="button" className="ms-btn ms-btn--secondary" onClick={() => void handleShare()}>
               <Share2 size={16} strokeWidth={1.75} aria-hidden="true" />
               Compartilhar
@@ -185,8 +222,15 @@ const GameOverScreen: React.FC<GameOverScreenProps> = ({
               Seu desempenho
             </button>
           </div>
-          <p className={`mt-2 text-caption ${shareState === 'error' ? 'text-danger' : 'text-fg-secondary'}`} role="status">
-            {shareState === 'copied' ? 'Resultado e link copiados.' : shareState === 'error' ? 'Não foi possível compartilhar. Copie o endereço da página.' : ''}
+          <p
+            className={`mt-2 text-caption ${shareState === 'error' ? 'text-danger' : 'text-fg-secondary'}`}
+            role="status"
+          >
+            {shareState === 'copied'
+              ? 'Resultado e link copiados.'
+              : shareState === 'error'
+                ? 'Não foi possível compartilhar. Copie o endereço da página.'
+                : ''}
           </p>
         </div>
       </section>

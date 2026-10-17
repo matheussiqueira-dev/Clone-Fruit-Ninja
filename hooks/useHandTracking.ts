@@ -84,4 +84,3 @@ export const useHandTracking = ({
     };
   }, [enabled, mirror, inputMode, videoRef, handPositionRef]);
 };
-

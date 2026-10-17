@@ -22,12 +22,7 @@ import {
   LeaderboardSubmission,
   VisionResult
 } from './types';
-import {
-  DEFAULT_SETTINGS,
-  INITIAL_STATS,
-  MAX_LIVES,
-  STORAGE_KEYS
-} from './config/gameConfig';
+import { DEFAULT_SETTINGS, INITIAL_STATS, MAX_LIVES, STORAGE_KEYS } from './config/gameConfig';
 import { useCameraController } from './hooks/useCameraController';
 import { useHandTracking } from './hooks/useHandTracking';
 import { usePointerTracking } from './hooks/usePointerTracking';
@@ -42,7 +37,9 @@ const STATS_HASH = '#desempenho';
 type MenuView = 'menu' | 'stats';
 
 const newRunId = () =>
-  typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 const App: React.FC = () => {
   const handPositionRef = useRef<VisionResult | null>(null);
@@ -76,13 +73,7 @@ const App: React.FC = () => {
   const prefersReducedMotion = useReducedMotion();
   const stageSize = useElementSize(stageRef);
 
-  const {
-    videoRef,
-    cameraStatus,
-    cameraFailure,
-    prepareCamera,
-    resetCamera
-  } = useCameraController();
+  const { videoRef, cameraStatus, cameraFailure, prepareCamera, resetCamera } = useCameraController();
 
   const leaderboard = useLeaderboard();
   const submitLeaderboard = leaderboard.submit;
@@ -169,60 +160,72 @@ const App: React.FC = () => {
     setGameState(GameState.PLAYING);
   }, [inputMode, prepareCamera, runMode, challengeDay, view, closeStats]);
 
-  const handleGameOver = useCallback((finalStats: GameStats, reason: GameOverReason) => {
-    setGameOverReason(reason);
-    setGameState(GameState.GAME_OVER);
-    setSenseiWisdom(getSenseiWisdom(finalStats.score));
+  const handleGameOver = useCallback(
+    (finalStats: GameStats, reason: GameOverReason) => {
+      setGameOverReason(reason);
+      setGameState(GameState.GAME_OVER);
+      setSenseiWisdom(getSenseiWisdom(finalStats.score));
 
-    const record: RunRecord = {
-      id: newRunId(),
-      at: new Date().toISOString(),
-      score: finalStats.score,
-      accuracy: computeAccuracy(finalStats.sliced, finalStats.missed),
-      maxCombo: finalStats.maxCombo,
-      sliced: finalStats.sliced,
-      missed: finalStats.missed,
-      inputMode,
-      mode: roundDay ? 'daily' : 'free',
-      ...(roundDay ? { day: roundDay } : {}),
-      reason
-    };
-    setStoredHistory((previous: unknown) => appendRun(normalizeHistory(previous), record));
+      const record: RunRecord = {
+        id: newRunId(),
+        at: new Date().toISOString(),
+        score: finalStats.score,
+        accuracy: computeAccuracy(finalStats.sliced, finalStats.missed),
+        maxCombo: finalStats.maxCombo,
+        sliced: finalStats.sliced,
+        missed: finalStats.missed,
+        inputMode,
+        mode: roundDay ? 'daily' : 'free',
+        ...(roundDay ? { day: roundDay } : {}),
+        reason
+      };
+      setStoredHistory((previous: unknown) => appendRun(normalizeHistory(previous), record));
 
-    // No round in progress, no camera: the next round reopens it (no new prompt once allowed).
-    resetCamera();
-  }, [inputMode, resetCamera, roundDay, setStoredHistory]);
+      // No round in progress, no camera: the next round reopens it (no new prompt once allowed).
+      resetCamera();
+    },
+    [inputMode, resetCamera, roundDay, setStoredHistory]
+  );
 
-  const handleInputModeChange = useCallback((mode: InputMode) => {
-    setInputMode(mode);
-  }, [setInputMode]);
+  const handleInputModeChange = useCallback(
+    (mode: InputMode) => {
+      setInputMode(mode);
+    },
+    [setInputMode]
+  );
 
   // Functional update: rapid toggles never overwrite each other.
-  const handleToggleSetting = useCallback((key: SettingKey) => {
-    setSettings((prev) => {
-      const current = { ...DEFAULT_SETTINGS, ...prev };
-      return { ...current, [key]: !current[key] };
-    });
-  }, [setSettings]);
+  const handleToggleSetting = useCallback(
+    (key: SettingKey) => {
+      setSettings((prev) => {
+        const current = { ...DEFAULT_SETTINGS, ...prev };
+        return { ...current, [key]: !current[key] };
+      });
+    },
+    [setSettings]
+  );
 
-  const handleSaveScore = useCallback(async (playerName: string) => {
-    const normalizedPlayer = playerName.trim();
+  const handleSaveScore = useCallback(
+    async (playerName: string) => {
+      const normalizedPlayer = playerName.trim();
 
-    const payload: LeaderboardSubmission = {
-      player: normalizedPlayer || 'Ninja',
-      score: stats.score,
-      accuracy: computeAccuracy(stats.sliced, stats.missed),
-      maxCombo: stats.maxCombo,
-      inputMode
-    };
+      const payload: LeaderboardSubmission = {
+        player: normalizedPlayer || 'Ninja',
+        score: stats.score,
+        accuracy: computeAccuracy(stats.sliced, stats.missed),
+        maxCombo: stats.maxCombo,
+        inputMode
+      };
 
-    const scope = await submitLeaderboard(payload);
-    // Remember the name only once it was accepted.
-    if (normalizedPlayer) {
-      setPlayerAlias(normalizedPlayer);
-    }
-    return scope;
-  }, [inputMode, setPlayerAlias, stats.maxCombo, stats.missed, stats.score, stats.sliced, submitLeaderboard]);
+      const scope = await submitLeaderboard(payload);
+      // Remember the name only once it was accepted.
+      if (normalizedPlayer) {
+        setPlayerAlias(normalizedPlayer);
+      }
+      return scope;
+    },
+    [inputMode, setPlayerAlias, stats.maxCombo, stats.missed, stats.score, stats.sliced, submitLeaderboard]
+  );
 
   const refreshLeaderboard = leaderboard.refresh;
   useGameHotkeys({
@@ -251,7 +254,9 @@ const App: React.FC = () => {
     // While playing the shell is locked to the viewport so the stage sits between HUD and footer;
     // in the other screens the page scrolls normally, so every action stays reachable on small screens.
     <div className={`flex flex-col ${isPlaying ? 'h-dvh overflow-hidden' : 'min-h-dvh'}`}>
-      <a className="ms-skip-link" href="#main-content">Pular para o conteúdo</a>
+      <a className="ms-skip-link" href="#main-content">
+        Pular para o conteúdo
+      </a>
       <SiteHeader />
 
       <main id="main-content" tabIndex={-1} className="flex min-h-0 flex-1 flex-col">
@@ -262,7 +267,10 @@ const App: React.FC = () => {
           </>
         )}
 
-        <div ref={stageRef} className={`relative flex min-h-0 flex-1 flex-col ${isPlaying ? 'touch-none overflow-hidden' : ''}`}>
+        <div
+          ref={stageRef}
+          className={`relative flex min-h-0 flex-1 flex-col ${isPlaying ? 'touch-none overflow-hidden' : ''}`}
+        >
           <video
             ref={videoRef}
             autoPlay

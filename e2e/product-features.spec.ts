@@ -16,7 +16,9 @@ test.beforeEach(async ({ page }) => {
   await seedRandom(page);
 });
 
-test('a shared challenge link opens that day\'s challenge, and the round is labelled with it', async ({ page }) => {
+test("a shared challenge link opens that day's challenge, and the round is labelled with it", async ({
+  page
+}) => {
   await page.goto('/?desafio=2026-01-05');
   await expect(page.getByLabel(/^Desafio de 05\/01/)).toBeChecked();
   await finishPointerRound(page);
@@ -29,7 +31,9 @@ test('a challenge link from the future falls back to today', async ({ page }) =>
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
   await page.goto('/?desafio=2999-12-31');
-  await expect(page.getByLabel(new RegExp(`^Desafio de ${dayLabel(today).replace('/', '\\/')}`))).toBeChecked();
+  await expect(
+    page.getByLabel(new RegExp(`^Desafio de ${dayLabel(today).replace('/', '\\/')}`))
+  ).toBeChecked();
 });
 
 test('finished rounds feed the performance view, with a table alternative to the chart', async ({ page }) => {
@@ -76,5 +80,7 @@ test('sharing copies the result and a link when the device has no share sheet', 
   await page.getByRole('button', { name: 'Compartilhar' }).click();
   await expect(page.getByText('Resultado e link copiados.')).toBeVisible();
   const copied = await page.evaluate(() => (window as unknown as { __copied: string | null }).__copied);
-  expect(copied).toMatch(/^Fiz 0 pontos no Shadow Dojo \(0% de precisão, combo x1\)\. Consegue me vencer\? http:\/\/shadow-dojo\.test:4190\/$/);
+  expect(copied).toMatch(
+    /^Fiz 0 pontos no Shadow Dojo \(0% de precisão, combo x1\)\. Consegue me vencer\? http:\/\/shadow-dojo\.test:4190\/$/
+  );
 });

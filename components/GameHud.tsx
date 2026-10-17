@@ -25,7 +25,9 @@ const GameHud: React.FC<GameHudProps> = ({ stats, maxLives, onOpenSettings }) =>
         <div className="flex items-center gap-2">
           <dt className="sr-only sm:not-sr-only text-fine text-fg-secondary">Vidas</dt>
           <dd className="flex items-center gap-1">
-            <span className="ms-sr-only">{stats.lives} de {maxLives}</span>
+            <span className="ms-sr-only">
+              {stats.lives} de {maxLives}
+            </span>
             {Array.from({ length: maxLives }).map((_, index) => {
               const alive = index < stats.lives;
               return (
@@ -42,7 +44,13 @@ const GameHud: React.FC<GameHudProps> = ({ stats, maxLives, onOpenSettings }) =>
           </dd>
         </div>
       </dl>
-      <button type="button" className="ms-btn ms-btn--ghost ms-btn--icon" onClick={onOpenSettings} aria-label="Ajustes" title="Ajustes">
+      <button
+        type="button"
+        className="ms-btn ms-btn--ghost ms-btn--icon"
+        onClick={onOpenSettings}
+        aria-label="Ajustes"
+        title="Ajustes"
+      >
         <Settings size={20} strokeWidth={1.75} aria-hidden="true" />
       </button>
     </div>

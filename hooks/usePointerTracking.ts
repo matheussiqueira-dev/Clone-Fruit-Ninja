@@ -9,7 +9,12 @@ interface PointerTrackingParams {
 }
 
 // Normalises the pointer to the game stage (0-1 on each axis), the same space the hand tracker uses.
-export const usePointerTracking = ({ enabled, gameStateRef, handPositionRef, stageRef }: PointerTrackingParams) => {
+export const usePointerTracking = ({
+  enabled,
+  gameStateRef,
+  handPositionRef,
+  stageRef
+}: PointerTrackingParams) => {
   useEffect(() => {
     if (!enabled) return;
 

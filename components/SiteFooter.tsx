@@ -14,9 +14,19 @@ const SiteFooter: React.FC = () => {
           <a href="https://www.matheussiqueira.dev">www.matheussiqueira.dev</a>
         </p>
         <nav className="ms-footer__links" aria-label="Links do autor">
-          <a href="https://www.linkedin.com/in/matheussiqueira-dev" target="_blank" rel="noopener noreferrer">LinkedIn<span className="ms-sr-only"> (abre em nova aba)</span></a>
-          <a href="https://github.com/matheussiqueira-dev" target="_blank" rel="noopener noreferrer">GitHub<span className="ms-sr-only"> (abre em nova aba)</span></a>
-          <a href="https://github.com/matheussiqueira-dev/Clone-Fruit-Ninja" target="_blank" rel="noopener noreferrer">Código deste projeto<span className="ms-sr-only"> (abre em nova aba)</span></a>
+          <a href="https://www.linkedin.com/in/matheussiqueira-dev" target="_blank" rel="noopener noreferrer">
+            LinkedIn<span className="ms-sr-only"> (abre em nova aba)</span>
+          </a>
+          <a href="https://github.com/matheussiqueira-dev" target="_blank" rel="noopener noreferrer">
+            GitHub<span className="ms-sr-only"> (abre em nova aba)</span>
+          </a>
+          <a
+            href="https://github.com/matheussiqueira-dev/Clone-Fruit-Ninja"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Código deste projeto<span className="ms-sr-only"> (abre em nova aba)</span>
+          </a>
         </nav>
         <p className="ms-footer__meta">{meta}</p>
       </div>

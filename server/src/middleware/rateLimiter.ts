@@ -13,14 +13,17 @@ interface RateLimiterOptions {
 export const createRateLimiter = ({ windowMs, maxRequests }: RateLimiterOptions) => {
   const buckets = new Map<string, Bucket>();
 
-  const cleanupInterval = setInterval(() => {
-    const now = Date.now();
-    buckets.forEach((bucket, key) => {
-      if (bucket.resetAt <= now) {
-        buckets.delete(key);
-      }
-    });
-  }, Math.max(windowMs, 30_000));
+  const cleanupInterval = setInterval(
+    () => {
+      const now = Date.now();
+      buckets.forEach((bucket, key) => {
+        if (bucket.resetAt <= now) {
+          buckets.delete(key);
+        }
+      });
+    },
+    Math.max(windowMs, 30_000)
+  );
 
   cleanupInterval.unref();
 

@@ -7,15 +7,16 @@ const WIDTH = 800;
 const HEIGHT = 600;
 const FRAME = 1 / 60;
 
-const makeEngine = (seed = 1): GameEngine => createGameEngine({
-  width: WIDTH,
-  height: HEIGHT,
-  maxLives: 3,
-  rng: createSeededRng(seed),
-  cosmeticRng: createSeededRng(999),
-  particles: true,
-  trailLimit: 14
-});
+const makeEngine = (seed = 1): GameEngine =>
+  createGameEngine({
+    width: WIDTH,
+    height: HEIGHT,
+    maxLives: 3,
+    rng: createSeededRng(seed),
+    cosmeticRng: createSeededRng(999),
+    particles: true,
+    trailLimit: 14
+  });
 
 // A fruit parked in the middle of the stage, not moving, so the blade can be aimed at it.
 const parkFruit = (engine: GameEngine, overrides: Partial<Fruit> = {}): Fruit => {
@@ -80,7 +81,12 @@ describe('createGameEngine', () => {
   it('spawns the same fruit sequence for the same seed, regardless of particle settings', () => {
     const run = (particles: boolean) => {
       const engine = createGameEngine({
-        width: WIDTH, height: HEIGHT, maxLives: 3, rng: createSeededRng(7), particles, trailLimit: 14
+        width: WIDTH,
+        height: HEIGHT,
+        maxLives: 3,
+        rng: createSeededRng(7),
+        particles,
+        trailLimit: 14
       });
       for (let i = 0; i < 120; i++) engine.step(FRAME, i * 16, null);
       return engine.state.fruits.map((fruit) => [fruit.kind, Math.round(fruit.x), Math.round(fruit.vy)]);
@@ -124,8 +130,18 @@ describe('createGameEngine', () => {
     let gameOver = null;
     for (let i = 0; i < 3 && !gameOver; i++) {
       engine.state.fruits.push({
-        id: `drop-${i}`, x: 100, y: HEIGHT + 200, vx: 0, vy: 0, radius: 30, kind: 'orange',
-        type: 'fruit', rotation: 0, rotationSpeed: 0, timeScale: 1, sliced: false
+        id: `drop-${i}`,
+        x: 100,
+        y: HEIGHT + 200,
+        vx: 0,
+        vy: 0,
+        radius: 30,
+        kind: 'orange',
+        type: 'fruit',
+        rotation: 0,
+        rotationSpeed: 0,
+        timeScale: 1,
+        sliced: false
       });
       gameOver = engine.step(FRAME, i * 16, null).gameOver;
     }

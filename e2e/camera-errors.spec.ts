@@ -37,7 +37,10 @@ const expectAlert = async (page: Page, message: string) => {
 test('a denied permission explains how to unblock and offers the mouse', async ({ page }) => {
   await rejectCamera(page, 'NotAllowedError');
   await activateCamera(page);
-  await expectAlert(page, 'A câmera foi bloqueada. Libere o acesso no ícone do cadeado ou jogue com o mouse.');
+  await expectAlert(
+    page,
+    'A câmera foi bloqueada. Libere o acesso no ícone do cadeado ou jogue com o mouse.'
+  );
 
   await page.getByRole('alert').getByRole('button', { name: 'Jogar com o mouse' }).click();
   await expect(page.getByLabel(/^Mouse/)).toBeChecked();
@@ -56,12 +59,17 @@ test('an unrecognised camera error still gets a generic, actionable message', as
   await expectAlert(page, 'Não foi possível abrir a câmera. Tente de novo ou jogue com o mouse.');
 });
 
-test('a page without camera access (e.g. plain http on a LAN) says so and keeps the mouse', async ({ page }) => {
+test('a page without camera access (e.g. plain http on a LAN) says so and keeps the mouse', async ({
+  page
+}) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'mediaDevices', { value: undefined, configurable: true });
   });
   await activateCamera(page);
-  await expectAlert(page, 'Este navegador não dá acesso à câmera nesta página. O modo mouse está disponível.');
+  await expectAlert(
+    page,
+    'Este navegador não dá acesso à câmera nesta página. O modo mouse está disponível.'
+  );
 });
 
 test('a hand model that fails to load never asks for the camera', async ({ page }) => {
@@ -70,5 +78,7 @@ test('a hand model that fails to load never asks for the camera', async ({ page 
   await activateCamera(page);
 
   await expectAlert(page, 'Não foi possível carregar o modelo da mão. Verifique a conexão e tente de novo.');
-  expect(await page.evaluate(() => (window as unknown as { __cameraRequested: boolean }).__cameraRequested)).toBe(false);
+  expect(
+    await page.evaluate(() => (window as unknown as { __cameraRequested: boolean }).__cameraRequested)
+  ).toBe(false);
 });

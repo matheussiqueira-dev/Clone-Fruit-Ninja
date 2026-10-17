@@ -16,7 +16,9 @@ const NON_TEXT_INPUT_TYPES = new Set(['radio', 'checkbox', 'button', 'submit', '
 const isTypingContext = (target: EventTarget | null) => {
   if (!(target instanceof HTMLElement)) return false;
   if (target instanceof HTMLInputElement) return !NON_TEXT_INPUT_TYPES.has(target.type);
-  return target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || target.isContentEditable;
+  return (
+    target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || target.isContentEditable
+  );
 };
 
 // Enter on a focused button activates that button; the global shortcut must not fire a second action.
@@ -54,7 +56,10 @@ export const useGameHotkeys = ({
         void onInputModeChange(inputMode === 'camera' ? 'pointer' : 'camera');
       }
 
-      if (event.key.toLowerCase() === 'r' && (gameState === GameState.MENU || gameState === GameState.GAME_OVER)) {
+      if (
+        event.key.toLowerCase() === 'r' &&
+        (gameState === GameState.MENU || gameState === GameState.GAME_OVER)
+      ) {
         event.preventDefault();
         void onRefreshLeaderboard();
       }

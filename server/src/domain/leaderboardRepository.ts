@@ -1,9 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import {
-  LeaderboardEntry,
-  LeaderboardSubmission
-} from '../../../types';
+import { LeaderboardEntry, LeaderboardSubmission } from '../../../types';
 import { normalizeLeaderboardEntries, sortLeaderboard } from '../../../lib/leaderboard';
 
 interface LeaderboardRepository {
@@ -59,7 +56,10 @@ export const createFileLeaderboardRepository = (filePath = DEFAULT_PATH): Leader
 
   const runSafely = async <T>(task: () => Promise<T>) => {
     const result = writeQueue.then(task, task);
-    writeQueue = result.then(() => undefined, () => undefined);
+    writeQueue = result.then(
+      () => undefined,
+      () => undefined
+    );
     return result;
   };
 

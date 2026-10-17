@@ -22,8 +22,14 @@ const LoadingScreen: React.FC<{ cameraStatus: CameraStatus }> = ({ cameraStatus 
 
   return (
     <div className="ms-container flex w-full max-w-[32rem] flex-1 items-center py-10">
-      <section className="ms-card flex w-full flex-col gap-3" aria-labelledby="loading-title" aria-busy="true">
-        <h1 id="loading-title" className="text-h2 text-fg">Preparando a câmera</h1>
+      <section
+        className="ms-card flex w-full flex-col gap-3"
+        aria-labelledby="loading-title"
+        aria-busy="true"
+      >
+        <h1 id="loading-title" className="text-h2 text-fg">
+          Preparando a câmera
+        </h1>
         <p className="flex items-center gap-2 text-body text-fg-secondary" role="status">
           <LoaderCircle size={16} strokeWidth={1.75} aria-hidden="true" className="ms-spinner" />
           {step}…

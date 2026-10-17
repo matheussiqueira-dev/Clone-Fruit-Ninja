@@ -77,12 +77,34 @@ export default {
         small: [v('text-small'), { lineHeight: v('text-small--line-height') }],
         body: [v('text-body'), { lineHeight: v('text-body--line-height') }],
         lead: [v('text-lead'), { lineHeight: v('text-lead--line-height') }],
-        h4: [v('text-h4'), { lineHeight: v('text-h4--line-height'), letterSpacing: v('tracking-tight'), fontWeight: '600' }],
-        h3: [v('text-h3'), { lineHeight: v('text-h3--line-height'), letterSpacing: v('tracking-tight'), fontWeight: '600' }],
-        h2: [v('text-h2'), { lineHeight: v('text-h2--line-height'), letterSpacing: v('tracking-heading'), fontWeight: '600' }],
-        h1: [v('text-h1'), { lineHeight: v('text-h1--line-height'), letterSpacing: v('tracking-heading'), fontWeight: '700' }],
-        kpi: [v('text-kpi'), { lineHeight: v('text-kpi--line-height'), letterSpacing: v('tracking-tight'), fontWeight: '600' }],
-        display: [v('text-display'), { lineHeight: v('text-display--line-height'), letterSpacing: v('tracking-display'), fontWeight: '700' }]
+        h4: [
+          v('text-h4'),
+          { lineHeight: v('text-h4--line-height'), letterSpacing: v('tracking-tight'), fontWeight: '600' }
+        ],
+        h3: [
+          v('text-h3'),
+          { lineHeight: v('text-h3--line-height'), letterSpacing: v('tracking-tight'), fontWeight: '600' }
+        ],
+        h2: [
+          v('text-h2'),
+          { lineHeight: v('text-h2--line-height'), letterSpacing: v('tracking-heading'), fontWeight: '600' }
+        ],
+        h1: [
+          v('text-h1'),
+          { lineHeight: v('text-h1--line-height'), letterSpacing: v('tracking-heading'), fontWeight: '700' }
+        ],
+        kpi: [
+          v('text-kpi'),
+          { lineHeight: v('text-kpi--line-height'), letterSpacing: v('tracking-tight'), fontWeight: '600' }
+        ],
+        display: [
+          v('text-display'),
+          {
+            lineHeight: v('text-display--line-height'),
+            letterSpacing: v('tracking-display'),
+            fontWeight: '700'
+          }
+        ]
       },
       letterSpacing: {
         display: v('tracking-display'),
