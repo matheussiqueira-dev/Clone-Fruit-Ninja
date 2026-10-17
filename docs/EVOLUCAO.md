@@ -2,6 +2,8 @@
 
 Roteiro técnico e de produto do Shadow Dojo, jogo de corte no navegador com rastreamento de mão (MediaPipe) e modo mouse. O documento registra de onde o projeto partiu, o que mudou, por quê, e o que vem a seguir.
 
+> Cobre as versões 0.1 e 0.2. A fase seguinte (Tailwind 4, Vite 8, MediaPipe 1.x, lint e testes de CSP) e os próximos passos estão em [`MASTER_EVOLUTION_PLAN.md`](../MASTER_EVOLUTION_PLAN.md).
+
 | | |
 |---|---|
 | Versão | 0.2.0 (2026-10-15) |

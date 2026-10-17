@@ -30,7 +30,7 @@ Atalhos: `Enter` começa, `M` troca o modo e `R` atualiza os resultados.
 ### Limites conhecidos
 
 - O modelo rastreia uma mão só. Pouca luz ou fundo com a cor da pele reduzem a precisão.
-- Na primeira vez, o modo câmera baixa o modelo (7,8 MB) e o runtime WASM (cerca de 11 MB), servidos pelo próprio site.
+- Na primeira vez, o modo câmera baixa o modelo (7,8 MB) e o runtime WASM (cerca de 13,5 MB), servidos pelo próprio site.
 - Sem câmera, com a permissão negada, com a câmera em uso ou se o modelo não carregar, o jogo mostra uma mensagem própria e o modo mouse continua disponível.
 
 ## Onde ficam os resultados
@@ -41,15 +41,17 @@ O servidor opcional em `server/` (Express) oferece um ranking compartilhado para
 
 ## Stack
 
-- React 19, TypeScript 5.8 e Vite 6.
-- Tailwind CSS 3 mapeado para o design system compartilhado `ms-tokens.css` v1.0, com IBM Plex Sans servida pelo próprio site.
-- MediaPipe Tasks Vision 0.10.32, com WASM e modelo em `public/vision/` (Apache 2.0, Google).
+- React 19, TypeScript 5.8 e Vite 8 (Rolldown).
+- Tailwind CSS 4 (plugin do Vite) mapeado para o design system compartilhado `ms-tokens.css` v1.0, com IBM Plex Sans servida pelo próprio site.
+- MediaPipe Tasks Vision 1.1.1, com WASM e modelo em `public/vision/` (Apache 2.0, Google).
 - Express 4 + Helmet no servidor opcional de ranking.
-- Vitest (unitários) e Playwright + axe (ponta a ponta e acessibilidade).
+- Vitest com cobertura (unitários), Playwright + axe (ponta a ponta e acessibilidade), ESLint com tipos e Prettier.
+
+Arquitetura, lógica central e decisões: [`PROJECT_OVERVIEW.md`](PROJECT_OVERVIEW.md). Roteiro e bibliotecas: [`ROADMAP_AND_SKILLS.md`](ROADMAP_AND_SKILLS.md). Plano executivo e próximas features: [`MASTER_EVOLUTION_PLAN.md`](MASTER_EVOLUTION_PLAN.md).
 
 ## Rodar localmente
 
-Pré-requisitos: Node.js 20+ e npm 10+.
+Pré-requisitos: Node.js 22.12+ (o CI usa o 24) e npm 10+.
 
 ```bash
 npm ci
@@ -77,16 +79,20 @@ Veja `.env.example`. No deploy estático, deixe `VITE_LEADERBOARD_API_URL` vazia
 ## Qualidade
 
 ```bash
-npm run typecheck   # tsc --noEmit
-npm test            # Vitest
-npm run build       # build de produção em dist/
-npm run e2e         # Playwright (Edge local; Chromium no CI)
+npm run typecheck      # tsc --noEmit
+npm run lint           # ESLint com regras que usam os tipos
+npm run format:check   # Prettier
+npm test               # Vitest
+npm run test:coverage  # Vitest com cobertura do domínio (piso de 80%)
+npm run build          # build de produção em dist/
+npm run e2e            # Playwright (Edge local; Chromium no CI)
 ```
 
-- O CI (`.github/workflows/ci.yml`) roda typecheck, testes, build, build do servidor, audit e a suíte de ponta a ponta em cada PR.
-- A suíte de ponta a ponta cobre a partida no modo mouse, o cursor parado, o salvamento local, as falhas de câmera (simuladas), o desafio diário, o painel de desempenho e o compartilhamento. O axe roda no menu, no fim de jogo e no painel em 320, 768 e 1280 px.
+- O CI (`.github/workflows/ci.yml`, Node 24) roda typecheck, lint, formatação, testes com cobertura, build, build do servidor, `npm audit` e a suíte de ponta a ponta em cada PR.
+- A suíte de ponta a ponta roda sob a CSP do `vercel.json` (o `vite preview` envia os mesmos headers) e cobre a partida no modo mouse, o cursor parado, o salvamento local, a partida com câmera (modelo real, câmera sintética), as falhas de câmera (simuladas), o desafio diário, o painel de desempenho e o compartilhamento. O axe roda no menu, no fim de jogo e no painel em 320, 768 e 1280 px.
 - TypeScript em modo `strict` no front e no servidor.
-- O `npm audit` não aponta nenhum alerta crítico. Os alertas altos restantes vêm da cadeia de build do Tailwind 3 (`braces`, `micromatch`, `chokidar`, `fast-glob`): negação de serviço por padrões glob, que só roda no build e com a configuração do próprio repositório. Corrigir exige migrar para o Tailwind 4.
+- O `npm audit` não aponta nenhum alerta, e o CI falha se aparecer algum.
+- O runtime WASM em `public/vision/wasm` é cópia exata do pacote instalado. Depois de mudar a versão de `@mediapipe/tasks-vision`, rode `npm run sync:vision`; um teste confere o SHA-256 de cada arquivo.
 - O `ms-tokens.css` é copiado do padrão, sem edição. Um teste confere o SHA-256 dele.
 
 ## Deploy
