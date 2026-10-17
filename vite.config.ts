@@ -3,6 +3,16 @@ import { configDefaults, defineConfig } from 'vitest/config';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import packageJson from './package.json' with { type: 'json' };
+import vercelConfig from './vercel.json' with { type: 'json' };
+
+// The preview server sends the deploy's site-wide headers (CSP, Permissions-Policy...), so the
+// Playwright suite runs under the same policy as production.
+const deployHeaders = Object.fromEntries(
+  (vercelConfig.headers.find((rule) => rule.source === '/(.*)')?.headers ?? []).map(({ key, value }) => [
+    key,
+    value
+  ])
+);
 
 // Footer meta line (A.9): version from the manifest, short commit only on Vercel builds.
 const commitSha = (process.env.VERCEL_GIT_COMMIT_SHA ?? '').slice(0, 7);
@@ -25,7 +35,8 @@ export default defineConfig({
   },
   preview: {
     // Host used by the Playwright suite (playwright.config.ts) to mimic the static deploy.
-    allowedHosts: ['shadow-dojo.test']
+    allowedHosts: ['shadow-dojo.test'],
+    headers: deployHeaders
   },
   plugins: [react(), tailwindcss()],
   resolve: {
