@@ -1,8 +1,8 @@
-import path from 'path';
+import path from 'node:path';
 import { configDefaults, defineConfig } from 'vitest/config';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import packageJson from './package.json';
+import packageJson from './package.json' with { type: 'json' };
 
 // Footer meta line (A.9): version from the manifest, short commit only on Vercel builds.
 const commitSha = (process.env.VERCEL_GIT_COMMIT_SHA ?? '').slice(0, 7);
@@ -30,7 +30,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, '.')
+      '@': path.resolve(import.meta.dirname, '.')
     }
   },
   test: {
