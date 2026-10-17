@@ -135,7 +135,7 @@ const GameOverScreen: React.FC<GameOverScreenProps> = ({
   ];
 
   return (
-    <div className="ms-container grid w-full max-w-[70rem] gap-6 py-6 lg:grid-cols-[3fr_2fr] lg:items-start lg:py-10">
+    <div className="ms-container grid w-full max-w-280 gap-6 py-6 lg:grid-cols-[3fr_2fr] lg:items-start lg:py-10">
       <section className="ms-card flex flex-col gap-6" aria-labelledby="game-over-title">
         <div className="flex flex-col gap-2">
           <h1 id="game-over-title" className="text-h1 text-fg">

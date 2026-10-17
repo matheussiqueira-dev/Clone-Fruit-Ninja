@@ -11,7 +11,7 @@ interface GameHudProps {
 
 // One 48px strip during play: numbers only, no cards, so the stage keeps the rest of the screen.
 const GameHud: React.FC<GameHudProps> = ({ stats, maxLives, onOpenSettings }) => (
-  <div className="flex h-12 flex-shrink-0 items-center border-b border-line bg-canvas-subtle">
+  <div className="flex h-12 shrink-0 items-center border-b border-line bg-canvas-subtle">
     <div className="ms-container flex items-center justify-between gap-4">
       <dl className="flex items-center gap-5 sm:gap-8">
         <div className="flex items-baseline gap-2">

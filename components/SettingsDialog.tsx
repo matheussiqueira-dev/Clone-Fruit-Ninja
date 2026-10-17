@@ -98,7 +98,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, settings, lockedO
                     </span>
                   )}
                 </span>
-                <span className="flex flex-shrink-0 items-center gap-3">
+                <span className="flex shrink-0 items-center gap-3">
                   <span className="text-caption text-fg-secondary" aria-hidden="true">
                     {checked ? 'Ativo' : 'Inativo'}
                   </span>

@@ -21,7 +21,7 @@ const LoadingScreen: React.FC<{ cameraStatus: CameraStatus }> = ({ cameraStatus 
   const step = STEP_LABELS[cameraStatus] ?? 'Preparando a partida';
 
   return (
-    <div className="ms-container flex w-full max-w-[32rem] flex-1 items-center py-10">
+    <div className="ms-container flex w-full max-w-lg flex-1 items-center py-10">
       <section
         className="ms-card flex w-full flex-col gap-3"
         aria-labelledby="loading-title"

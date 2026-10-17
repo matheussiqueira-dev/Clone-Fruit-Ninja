@@ -1,5 +1,6 @@
 import path from 'path';
 import { configDefaults, defineConfig } from 'vitest/config';
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import packageJson from './package.json';
 
@@ -26,7 +27,7 @@ export default defineConfig({
     // Host used by the Playwright suite (playwright.config.ts) to mimic the static deploy.
     allowedHosts: ['shadow-dojo.test']
   },
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, '.')

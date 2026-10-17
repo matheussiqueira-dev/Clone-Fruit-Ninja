@@ -35,7 +35,7 @@ const StatsScreen: React.FC<StatsScreenProps> = ({ history, onBack, onPlay }) =>
   ];
 
   return (
-    <div className="ms-container flex w-full max-w-[70rem] flex-col gap-6 py-6 lg:py-10">
+    <div className="ms-container flex w-full max-w-280 flex-col gap-6 py-6 lg:py-10">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-h1 text-fg">Seu desempenho</h1>
         <button type="button" className="ms-btn ms-btn--ghost" onClick={onBack}>

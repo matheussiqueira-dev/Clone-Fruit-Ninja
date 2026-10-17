@@ -52,7 +52,7 @@ const MenuScreen: React.FC<MenuScreenProps> = ({
     : 'Modo mouse selecionado';
 
   return (
-    <div className="ms-container grid w-full max-w-[70rem] gap-6 py-6 lg:grid-cols-[3fr_2fr] lg:items-start lg:py-10">
+    <div className="ms-container grid w-full max-w-280 gap-6 py-6 lg:grid-cols-[3fr_2fr] lg:items-start lg:py-10">
       <section className="ms-card flex flex-col gap-6" aria-labelledby="menu-title">
         <div className="flex flex-col gap-2">
           <h1 id="menu-title" className="text-display text-fg">

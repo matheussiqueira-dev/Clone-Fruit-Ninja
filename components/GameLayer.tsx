@@ -146,7 +146,7 @@ const GameLayer: React.FC<GameLayerProps> = ({
     };
   }, [gameState, paused, reducedMotion, width, height, settings, handPositionRef, onStatsUpdate, onGameOver]);
 
-  return <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none absolute inset-0 z-[1]" />;
+  return <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none absolute inset-0 z-1" />;
 };
 
 export default GameLayer;

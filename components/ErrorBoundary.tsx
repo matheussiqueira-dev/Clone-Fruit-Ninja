@@ -28,7 +28,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
     return (
       <main id="main-content" className="ms-container flex min-h-dvh items-center py-10">
-        <div className="ms-alert w-full max-w-[32rem]" role="alert">
+        <div className="ms-alert w-full max-w-lg" role="alert">
           <CircleAlert size={20} strokeWidth={1.75} aria-hidden="true" className="ms-alert__icon" />
           <div>
             <h1 className="text-body font-semibold text-fg">O jogo parou de responder.</h1>

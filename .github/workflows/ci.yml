@@ -29,8 +29,8 @@ jobs:
       - run: npm run test:coverage
       - run: npm run build
       - run: npm run build:server
-      # Critical only: the remaining high advisories come from the Tailwind 3 build chain (documented in the README).
-      - run: npm audit --audit-level=critical
+      # Any advisory fails the build: the Tailwind 4 migration cleared the last ones (Tailwind 3 build chain).
+      - run: npm audit
 
   e2e:
     name: End-to-end (Playwright)
